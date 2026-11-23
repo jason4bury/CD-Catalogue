@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 # The version lives here and in CHANGELOG.md; Build.cmd stops if they disagree.
 # Two-digit minor: 1.00, 1.01 ... 1.10. The release folder is "CD Catalogue v<version>".
 $script:AppName     = 'CD Catalogue'
-$script:AppVersion  = '1.01'
+$script:AppVersion  = '1.02'
 $script:Description = 'PowerShell/WPF tool for cataloguing a CD collection'
 $script:Copyright   = 'Copyright (c) 2026 Jason Rhodes'
 $script:RepoUrl     = 'https://github.com/jason4bury/CD-Catalogue'
@@ -460,8 +460,15 @@ public class CdItem {
     public int Discs { get; set; }
     public string Cover { get; set; }      // picture file saved in the app's Covers folder (or one you chose)
     public string Notes { get; set; }
+    public string Disc { get; set; }       // a photo of the disc itself (its label), or '-' when the Cover Art Archive has none
+    public string DiscOf { get; set; }     // the MusicBrainz release that Disc was looked for (so a new version is looked again)
+    public string DiscWhen { get; set; }   // when it was looked for: a CD with no photo is looked again a week later
     public string Added { get; set; }
     public string Mbid { get; set; }       // MusicBrainz release ('-' once looked up and not found)
+    // For putting CDs in artist order: "The" skipped, and CDs with no artist last.
+    public int NoArtist { get { return string.IsNullOrWhiteSpace(Artist) ? 1 : 0; } }
+    public string ArtistSort { get { var a = (Artist ?? "").Trim().ToLowerInvariant();
+        return a.StartsWith("the ", StringComparison.OrdinalIgnoreCase) ? a.Substring(4).TrimStart() : a; } }
     public bool FromMb { get { return !string.IsNullOrEmpty(Mbid) && Mbid != "-"; } }   // details from MusicBrainz, else typed in
     public string Source { get { return FromMb ? "MusicBrainz" : "By hand"; } }
     public string Shown { get { return Cover != null && Cover != "" && System.IO.File.Exists(Cover) ? Cover : null; } }
@@ -612,7 +619,7 @@ public class CdWallPanel : VirtualizingPanel, IScrollInfo {
 $script:CatalogPath = Join-Path $script:DataDir 'catalogue.json'
 $script:CoverDir = Join-Path $script:DataDir 'Covers'
 $script:Items = New-Object Collections.ObjectModel.ObservableCollection[CdItem]
-$script:Fields = 'Id', 'Barcode', 'Artist', 'Album', 'Year', 'Genre', 'Label', 'Country', 'Cover', 'Notes', 'Added', 'Mbid'
+$script:Fields = 'Id', 'Barcode', 'Artist', 'Album', 'Year', 'Genre', 'Label', 'Country', 'Cover', 'Notes', 'Added', 'Mbid', 'Disc', 'DiscOf', 'DiscWhen'
 
 function Save-Catalogue {
     try {
@@ -851,7 +858,7 @@ ADDING CDS BY BARCODE
 Click in the barcode box at the top and scan the barcode on the back of the CD with a USB or Bluetooth barcode scanner (it types the number and presses Enter for you), or type the number under the bars and press Enter. The details come from MusicBrainz and the cover from the Cover Art Archive (both free, no account). You can scan one CD after another: each is looked up in turn, about one a second. A CD already in the list is pointed out instead of being added twice. A barcode MusicBrainz doesn't know is still added, as "(not found)", so you can fill it in with Edit.
 
 WHICH VERSION IS YOURS?
-MusicBrainz often has several versions of a CD with the same barcode: other countries, reissues, different labels or box sets. When a barcode has more than one, the CD is added with the most likely one and, once the look-ups have finished, the app asks which is yours: each version shows its cover, date, country, label, catalogue number, format and tracks (Page opens it on MusicBrainz). Pick yours, or Keep the current one. Choose the version, under a CD's details, shows them again at any time.
+MusicBrainz often has several versions of a CD with the same barcode: other countries, reissues, different labels or box sets. When a barcode has more than one, the CD is added with the most likely one and, once the look-ups have finished, the app asks which is yours: each version shows its cover, date, country, label, catalogue number, format and tracks (See on MusicBrainz opens its page there, with its track list and photos of the sleeve). Pick yours, or Keep the current one. Choose the version, under a CD's details, shows them again at any time.
 
 SCANNING SEVERAL CDS FIRST
 Scan several lets you scan a pile of CDs before anything is looked up. Press Scan several, scan the first CD, then the next, and so on: each barcode goes on a waiting list (the status line shows them, and the Search button how many). When you've scanned them all, press Search (or press Enter in the empty barcode box, or type search). They're then looked up one after another, about one a second, and each appears in the list as it's found. A CD already in your catalogue, or already on the list, is pointed out as you scan it. Cancel (or Esc) leaves Scan several and forgets the list.
@@ -866,7 +873,7 @@ Covers shows your CDs as a wall of covers, List as a list, and Artists by artist
 THE KEY: MB AND HAND
 Every CD has a mark on its cover (and in List's From column): MB when its details came from MusicBrainz (scanned, or found with Look up), Hand when they were entered by hand (added by hand, or a barcode MusicBrainz didn't know, filled in with Edit). The key at the top right shows how many of each; click one to show only those CDs, and click it again to show them all. You can also search source:mb or source:hand. A hand-entered CD becomes MB once Look up (or Look up online) finds it.
 ARTISTS
-Artists lists every artist on the left, with how many CDs you have and the years they span, and shows the one you pick like a discography: all their CDs together, oldest first, with their genres and labels. The search box works here too. Names count as the same artist whatever their capitals, "The" is skipped when they're put in order, and CDs with no artist are listed last. Click a cover to see its details; double-click it to edit it.
+Artists lists every artist on the left, with how many CDs you have and the years they span. It opens on All artists (every CD, in artist order and then by year); pick an artist to see them like a discography: all their CDs together, oldest first, with their genres and labels. The search box works here too. Names count as the same artist whatever their capitals, "The" is skipped when they're put in order, and CDs with no artist are listed last. Click a cover to see its details; double-click it to edit it.
 
 SEARCHING
 Type in the search box to find CDs; the search runs a moment after you stop typing. It looks through everything: artist, album, label, genre, barcode, notes, and the year when you type one. The button at its right (All) picks one thing to search instead: Artist, Album, Year, Label, Genre, Barcode or Notes.
@@ -876,8 +883,11 @@ A year can be one year (1997), a range (1990-1999, or 1990 to 1999) or a decade 
 CSV FILES AND EXCEL
 The CSV opens correctly in Excel with a double-click: barcodes keep every digit, and titles such as 007 or 3/4 stay as typed. To do that such values are written as ="007" in the file, which is what you'll see in a plain text editor, or in a program other than a spreadsheet that reads the CSV.
 
+THE DISC
+The disc beside the cover shows the CD's own label when the Cover Art Archive has a photo of it (people add these to MusicBrainz, so popular CDs often have one and others don't). They're found in the background, a CD at a time, for each CD from MusicBrainz; when its own version has none, the other versions with the same barcode are tried, as they usually share the disc print. A CD with no photo is looked at again a week later, in case someone has added one. Photos are kept in the Covers folder. With no photo, it shows a blank CD.
+
 MORE ABOUT THE CD AND ARTIST
-More about the CD and artist shows, side by side:
+More about the CD and artist shows the cover and the disc (its label, or a blank CD), and side by side:
 - the CD: its track listing with times, when the album first came out, this pressing's date, country, label and catalogue number, the format and packaging, genres, and the album's Wikipedia introduction;
 - the artist: where they're from, when they formed or were born (and split up or died), genres, the band's members (or the bands a person was in), and the artist's Wikipedia introduction.
 The links open the pages on MusicBrainz, Wikipedia, Discogs and the artist's own site. It's kept, so it opens at once next time (Look up again gets the latest). A CD with no genre gets one from MusicBrainz. Wikipedia is in the language Windows uses when there's a page in it, else English.
@@ -1214,7 +1224,7 @@ STYLES
             $b.Add_Click({ $pickedRef.Id = [string]$this.Tag; [Windows.Window]::GetWindow($this).Close() })
             [void]$row.Children.Add($b)
             $page = New-Object Windows.Controls.Button
-            $page.Content = 'Page'; $page.Tag = $v.Id; $page.Margin = '8,0,0,0'; $page.Padding = '12,7'; $page.VerticalAlignment = 'Center'
+            $page.Content = 'See on MusicBrainz'; $page.Tag = $v.Id; $page.Margin = '8,0,0,0'; $page.Padding = '12,7'; $page.VerticalAlignment = 'Center'
             $page.ToolTip = 'See this version on musicbrainz.org (track list, photos of the sleeve)'
             [Windows.Controls.Grid]::SetColumn($page, 2)
             $page.Add_Click({ Start-Process "https://musicbrainz.org/release/$($this.Tag)" })
@@ -1429,6 +1439,21 @@ function Show-InfoResult($Win, [CdItem]$Item, $Res) {
         $img.Width = 110; $img.Height = 110; $img.Margin = '0,0,14,0'; $img.VerticalAlignment = 'Top'; $img.Source = $pic
         [Windows.Controls.DockPanel]::SetDock($img, 'Left'); [void]$top.Children.Add($img)
     }
+    # The disc beside the cover: the CD's own label when there's a photo of it, else a blank CD.
+    $disc = New-Object Windows.Controls.Grid
+    $disc.Width = 110; $disc.Height = 110; $disc.Margin = '0,0,16,0'; $disc.VerticalAlignment = 'Top'
+    $label = if ($Item.Disc -and $Item.Disc -ne '-' -and $Item.DiscOf -eq $Item.Mbid) { Get-Picture $Item.Disc 220 } else { $null }
+    $face = New-Object Windows.Shapes.Ellipse
+    if ($label) { $lb = New-Object Windows.Media.ImageBrush $label; $lb.Stretch = 'UniformToFill'; $face.Fill = $lb } else { $face.Fill = Get-BlankDisc }
+    [void]$disc.Children.Add($face)
+    if ($label) {
+        foreach ($h in @(@(32, 0.65), @(13, 1.0))) {
+            $e = New-Object Windows.Shapes.Ellipse; $e.Width = $h[0]; $e.Height = $h[0]; $e.Fill = Get-Brush 'Card'; $e.Opacity = $h[1]
+            [void]$disc.Children.Add($e)
+        }
+        $disc.ToolTip = "The CD's label, from the Cover Art Archive"
+    } else { $disc.ToolTip = 'No photo of this CD''s label yet' }
+    [Windows.Controls.DockPanel]::SetDock($disc, 'Left'); [void]$top.Children.Add($disc)
     $tp = New-Object Windows.Controls.StackPanel; $tp.VerticalAlignment = 'Center'; [void]$top.Children.Add($tp)
     [void]$p.Children.Add($top)
     Add-InfoText $tp $(if ($cd) { $cd.Title } else { $Item.Title }) 'Title'
@@ -1970,11 +1995,11 @@ STYLES
             <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
               <StackPanel>
                 <Viewbox MaxHeight="210" HorizontalAlignment="Left">
-                  <Grid Width="264" Height="200">
+                  <Grid Width="318" Height="200">   <!-- the disc slides out far enough to show its hole -->
                     <Grid Width="186" Height="186" HorizontalAlignment="Right">
                       <Ellipse x:Name="DDisc" Fill="{Disc}"/>
                       <Ellipse Width="178" Height="178" Stroke="{Card}" StrokeThickness="1" Opacity="0.5"/>
-                      <Ellipse Width="54" Height="54" Fill="{Card}" Opacity="0.65"/><Ellipse Width="22" Height="22" Fill="{Card}"/>
+                      <Ellipse x:Name="DHub" Width="54" Height="54" Fill="{Card}" Opacity="0.65"/><Ellipse x:Name="DHole" Width="22" Height="22" Fill="{Card}"/>
                     </Grid>
                     <Border Width="200" Height="200" CornerRadius="12" Background="{Sleeve}" HorizontalAlignment="Left">
                       <Grid>
@@ -2079,16 +2104,23 @@ function Update-Artists {
         New-Object ArtistRow -Property @{ Key = $k; Name = $name; Meta = $meta; Count = $cds.Count; Sort = (Get-ArtistSort $name) }
     }
     $rows = @($rows | Sort-Object @{ Expression = { [int](-not $_.Key) } }, @{ Expression = { $_.Sort } })   # no artist last
+    # "All artists" first: every CD the search shows, by artist and then year. Artists opens on it.
+    $total = 0; foreach ($k in $groups.Keys) { $total += $groups[$k].Count }
+    $namedCount = @($groups.Keys | Where-Object { $_ }).Count
+    $all = New-Object ArtistRow -Property @{ Key = '*'; Name = 'All artists'; Count = $total; Sort = ''
+        Meta = "$total CD$(if ($total -ne 1) { 's' }) by $namedCount artist$(if ($namedCount -ne 1) { 's' })" }
+    $rows = @($all) + $rows
     $script:ArtistRows = $rows
     $script:ArtistFilling = $true
     try {
         $ui.ArtistList.ItemsSource = $rows
-        $named = @($rows | Where-Object { $_.Key }).Count
+        $named = @($rows | Where-Object { $_.Key -and $_.Key -ne '*' }).Count
         $ui.ArtCount.Text = "$named artist$(if ($named -ne 1) { 's' })"
-        $want = $script:DiscoKey
+        # All artists when Artists opens; after that the artist you were on (or the selected CD's, when
+        # one picked elsewhere is by someone else), unless you're on All artists.
+        $want = if ($null -eq $script:DiscoKey) { '*' } else { $script:DiscoKey }
         $sel = $ui.Grid.SelectedItem
-        # The selected CD's artist, except on first opening when that CD has no artist (they're listed last).
-        if ($sel -and $groups.ContainsKey((Get-ArtistKey $sel)) -and ((Get-ArtistKey $sel) -or $null -ne $script:DiscoKey)) { $want = Get-ArtistKey $sel }
+        if ($want -ne '*' -and $sel -and $groups.ContainsKey((Get-ArtistKey $sel))) { $want = Get-ArtistKey $sel }
         $row = @($rows | Where-Object { $_.Key -eq $want }) | Select-Object -First 1
         if (-not $row -and $rows.Count) { $row = $rows[0] }
         $ui.ArtistList.SelectedItem = $row
@@ -2102,7 +2134,15 @@ function Show-Artist($Row) {
     $ui = $script:UI
     $script:DiscoKey = if ($Row) { $Row.Key } else { $null }
     $script:DiscoSet = $null
-    if ($Row -and $script:ArtistGroups) { $script:DiscoSet = $script:ArtistGroups[$Row.Key] }   # assigned directly: an if would unroll the set
+    if ($Row -and $Row.Key -ne '*' -and $script:ArtistGroups) { $script:DiscoSet = $script:ArtistGroups[$Row.Key] }   # assigned directly: an if would unroll the set
+    $everyone = $Row -and $Row.Key -eq '*'
+    $sorts = if ($everyone) { @('NoArtist', 'ArtistSort', 'Year', 'Album') } else { @('Year', 'Album') }
+    if ((@($script:DiscoView.SortDescriptions | ForEach-Object PropertyName) -join ',') -ne ($sorts -join ',')) {
+        $script:DiscoView.SortDescriptions.Clear()
+        foreach ($p in $sorts) { $script:DiscoView.SortDescriptions.Add((New-Object ComponentModel.SortDescription $p, 'Ascending')) }
+    }
+    # The covers say who it's by on All artists, and the year on one artist.
+    $ui.Disco.ItemContainerStyle = $script:Window.FindResource($(if ($everyone) { 'WallTile' } else { 'DiscoTile' }))
     $script:DiscoView.Refresh()
     if (-not $Row) { $ui.ArtName.Text = ''; $ui.ArtMeta.Text = ''; return }
     $cds = @($script:DiscoView)
@@ -2111,7 +2151,8 @@ function Show-Artist($Row) {
     $labels = @($cds | ForEach-Object { $_.Label } | Where-Object { $_ } | Select-Object -Unique)
     $ui.ArtMeta.Text = (@($Row.Meta, ($genres -join ', '), $(if ($labels.Count) { "on $(@($labels | Select-Object -First 3) -join ', ')$(if ($labels.Count -gt 3) { ' and others' })" })) | Where-Object { $_ }) -join '  ·  '
     $sel = $ui.Grid.SelectedItem
-    if (-not $sel -or (Get-ArtistKey $sel) -ne $Row.Key) { if ($cds.Count) { $ui.Grid.SelectedItem = $cds[0] } }
+    $inView = $sel -and $(if ($everyone) { $cds -contains $sel } else { (Get-ArtistKey $sel) -eq $Row.Key })
+    if (-not $inView) { if ($cds.Count) { $ui.Grid.SelectedItem = $cds[0] } }
     else { $ui.Disco.SelectedItem = $sel; $ui.Disco.ScrollIntoView($sel) }
 }
 
@@ -2269,8 +2310,16 @@ function Show-Details {
     if ($pic) {
         $art = New-Object Windows.Media.ImageBrush $pic
         $art.Stretch = 'UniformToFill'
-        $ui.DCover.Background = $art; $ui.DDisc.Fill = $art
-    } else { $ui.DCover.Background = $null; $ui.DDisc.Fill = Get-Brush 'Disc' }
+        $ui.DCover.Background = $art
+    } else { $ui.DCover.Background = $null }
+    # The CD's own label on the disc when the Cover Art Archive has a photo of it, else a plain blank CD.
+    $label = if ($i.Disc -and $i.Disc -ne '-' -and $i.DiscOf -eq $i.Mbid) { Get-Picture $i.Disc 400 } else { $null }
+    if ($label) { $lb = New-Object Windows.Media.ImageBrush $label; $lb.Stretch = 'UniformToFill'; $ui.DDisc.Fill = $lb }
+    else { $ui.DDisc.Fill = Get-BlankDisc }
+    # The drawing has its own hub and hole; a photo gets them drawn over it.
+    $ui.DHub.Visibility = if ($label) { 'Visible' } else { 'Hidden' }
+    $ui.DHole.Visibility = $ui.DHub.Visibility
+    $ui.DDisc.ToolTip = if ($label) { "The CD's label, from the Cover Art Archive" } else { $null }
     $ui.DNoCover.Text = if ($pic) { '' } else { 'No cover. Edit to pick a picture, or look it up.' }
     $ui.DAlbum.Text = $i.Title
     $ui.DArtist.Text = $i.Artist
@@ -2356,6 +2405,89 @@ function Step-Choose {
     $script:ToChoose = @($script:ToChoose | Select-Object -Skip 1)
     $i = @($script:Items | Where-Object { $_.Id -eq $id }) | Select-Object -First 1
     if ($i) { Show-Versions $i }
+}
+
+# ---------------------------------------------------------------------------
+#  The disc's label: the Cover Art Archive often has a photo of the CD itself
+#  (its "Medium" picture) as well as the cover. It's looked for once per CD, one
+#  at a time in the background, and shown on the disc beside the cover.
+# ---------------------------------------------------------------------------
+$script:DiscScan = {
+    param([string]$Mbid, [string]$Barcode, [string]$Dir, [string]$Agent)
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    # The Medium (disc) picture of one release: its address, '' when it has none, $null when the archive couldn't be asked.
+    function Get-MediumUrl([string]$Release) {
+        try { $j = Invoke-RestMethod -Uri "https://coverartarchive.org/release/$Release" -UserAgent $Agent -TimeoutSec 20 }
+        catch {
+            $code = 0; try { $code = [int]$_.Exception.Response.StatusCode } catch { $code = 0 }
+            if ($code -eq 404 -or $code -eq 400) { return '' }
+            return $null
+        }
+        $img = @($j.images | Where-Object { @($_.types) -contains 'Medium' }) | Select-Object -First 1
+        if (-not $img) { return '' }
+        return (@([string]$img.thumbnails.'500', [string]$img.thumbnails.large, [string]$img.image) | Where-Object { $_ } | Select-Object -First 1) -replace '^http:', 'https:'
+    }
+    $u = Get-MediumUrl $Mbid
+    if ($null -eq $u) { return '' }
+    if (-not $u -and $Barcode) {
+        # None for this version: other versions with the same barcode usually have the same disc print.
+        try {
+            Start-Sleep -Milliseconds 1100   # MusicBrainz asks for one request a second
+            $r = Invoke-RestMethod -Uri ('https://musicbrainz.org/ws/2/release/?fmt=json&limit=10&query=barcode:' + [Uri]::EscapeDataString($Barcode)) -UserAgent $Agent -TimeoutSec 20
+            foreach ($rel in @($r.releases | Where-Object { $_.id -ne $Mbid -and $_.barcode -eq $Barcode } | Select-Object -First 8)) {
+                $u = Get-MediumUrl ([string]$rel.id)
+                if ($u) { break }
+                Start-Sleep -Milliseconds 300
+            }
+        } catch { return '' }
+    }
+    if (-not $u) { return '-' }
+    $file = Join-Path $Dir "$Mbid-disc.jpg"
+    try { Invoke-WebRequest -Uri $u -UserAgent $Agent -OutFile $file -UseBasicParsing -TimeoutSec 30; return $file }
+    catch { Remove-Item -LiteralPath $file -ErrorAction SilentlyContinue; return '' }
+}
+$script:DiscJob = $null
+# A blank CD (the app's own drawing, assets\blank-cd.png, with a real hole), for a disc with no photo of its label.
+$script:BlankDisc = $null
+function Get-BlankDisc {
+    if ($null -eq $script:BlankDisc) {
+        $img = Get-AssetImage 'blank-cd.png'
+        $script:BlankDisc = if ($img) { $b = New-Object Windows.Media.ImageBrush $img; $b.Stretch = 'Uniform'; $b.Freeze(); $b } else { Get-Brush 'Disc' }
+    }
+    return $script:BlankDisc
+}
+$script:DiscTried = New-Object 'Collections.Generic.HashSet[string]'   # this session: don't keep retrying a failed one
+$script:DiscFound = 0
+
+function Step-Disc {
+    <# Called by the timer: finishes a disc look-up, or starts the next one. #>
+    $job = $script:DiscJob
+    if ($job) {
+        if (-not $job.Handle.IsCompleted) { return }
+        $out = ''
+        try { $out = [string](@($job.PS.EndInvoke($job.Handle)) | Select-Object -Last 1) } catch { Write-AppLog "Disc picture: $($_.Exception.Message)" }
+        $job.PS.Dispose(); $script:DiscJob = $null
+        $i = $job.Item
+        if ($out -and $i.Mbid -eq $job.Mbid) {
+            $i.Disc = $out; $i.DiscOf = $job.Mbid; $i.DiscWhen = (Get-Date).ToString('yyyy-MM-dd'); $script:DiscFound++
+            if ($out -ne '-' -and [object]::ReferenceEquals($script:UI.Grid.SelectedItem, $i)) { Show-Details }
+            if ($script:DiscFound % 10 -eq 0) { Save-Catalogue }
+        }
+        return
+    }
+    if ($script:Worker) { return }   # MusicBrainz look-ups first
+    $next = $null
+    foreach ($i in $script:Items) {
+        if (-not $i.FromMb -or $script:DiscTried.Contains($i.Mbid)) { continue }
+        # Not looked for yet (or for another version), or none found over a week ago (someone may have added one).
+        $when = [datetime]::MinValue; [void][datetime]::TryParse([string]$i.DiscWhen, [ref]$when)
+        if ($i.DiscOf -ne $i.Mbid -or ($i.Disc -eq '-' -and $when -lt (Get-Date).AddDays(-7))) { $next = $i; break }
+    }
+    if (-not $next) { if ($script:DiscFound) { Save-Catalogue; $script:DiscFound = 0 }; return }
+    [void]$script:DiscTried.Add($next.Mbid)
+    $ps = [PowerShell]::Create()
+    [void]$ps.AddScript($script:DiscScan).AddArgument($next.Mbid).AddArgument([string]$next.Barcode).AddArgument($script:CoverDir).AddArgument($script:Agent)
+    $script:DiscJob = @{ PS = $ps; Handle = $ps.BeginInvoke(); Item = $next; Mbid = $next.Mbid }
 }
 
 # Scan several: barcodes are collected first, then looked up one after another.
@@ -2688,7 +2820,7 @@ try {
     if ($icon) { $window.Icon = $icon }
     $ui = @{}
     foreach ($n in 'BtnCsv', 'BtnReport', 'BtnCollection', 'BtnLook', 'BtnHelp', 'BtnAbout', 'TxtStatus', 'Progress', 'TxtSearch', 'TxtHint', 'BtnField', 'Key', 'KeyMb', 'KeyHand', 'KeyMbText', 'KeyHandText', 'BtnLookup', 'BtnAdd', 'TxtSummary', 'TxtTotals',
-                   'TxtBarcode', 'BtnScan', 'BtnBatch', 'TxtScanNote', 'Grid', 'BtnEdit', 'BtnRemove', 'BtnMb', 'BtnInfo', 'BtnVersions', 'DNoCover', 'DCover', 'DDisc', 'DAlbum', 'DArtist', 'DMeta', 'DNotes',
+                   'TxtBarcode', 'BtnScan', 'BtnBatch', 'TxtScanNote', 'Grid', 'BtnEdit', 'BtnRemove', 'BtnMb', 'BtnInfo', 'BtnVersions', 'DNoCover', 'DCover', 'DDisc', 'DHub', 'DHole', 'DAlbum', 'DArtist', 'DMeta', 'DNotes',
                    'ViewCovers', 'ViewList', 'ViewArtists', 'Wall', 'ListCard', 'ArtistCard', 'ArtistList', 'ArtCount', 'ArtName', 'ArtMeta', 'Disco',
                    'Empty', 'EmptyTitle', 'EmptyText', 'Details') { $ui[$n] = $window.FindName($n) }
     # The wall's panel is the app's own type, so it's set here rather than in the XAML.
@@ -2747,7 +2879,7 @@ try {
         }
         # In Artists, a CD picked anywhere (a new scan, a search) shows its artist.
         if ($sel -and $script:Settings.View -eq 'Artists' -and -not $script:ArtistFilling) {
-            if ((Get-ArtistKey $sel) -ne $script:DiscoKey) {
+            if ($script:DiscoKey -ne '*' -and (Get-ArtistKey $sel) -ne $script:DiscoKey) {
                 $row = @($script:ArtistRows | Where-Object { $_.Key -eq (Get-ArtistKey $sel) }) | Select-Object -First 1
                 if ($row) { $ui.ArtistList.SelectedItem = $row; $ui.ArtistList.ScrollIntoView($row) }
             }
@@ -2770,6 +2902,7 @@ try {
     $setView = {
         param([string]$View)
         $script:Settings.View = $View
+        if ($View -eq 'Artists') { $script:DiscoKey = $null }   # Artists always opens on All artists
         Save-AppSetting; Update-Shelf
         $sel = $ui.Grid.SelectedItem
         if ($sel) {
@@ -2802,6 +2935,7 @@ try {
     $script:DiscoSet = $null; $script:ArtistGroups = $null
     # The artist's CDs that the search shows (worked out once in Update-Artists); a CD added since then counts too.
     $script:DiscoView.Filter = [Predicate[object]]{ param($i)
+        if ($script:DiscoKey -eq '*') { return (-not $script:SearchTest -or (& $script:SearchTest $i)) }   # All artists
         if ($null -eq $script:DiscoSet) { return $false }
         if ($script:DiscoSet.Contains($i)) { return $true }
         return ([string]$i.Artist).Trim().ToLowerInvariant() -eq $script:DiscoKey -and (-not $script:SearchTest -or (& $script:SearchTest $i)) }
@@ -2810,7 +2944,7 @@ try {
     foreach ($sd in @(@('Artist', 'Ascending'), @('Year', 'Ascending'), @('Album', 'Ascending'))) { $sortView.SortDescriptions.Add((New-Object ComponentModel.SortDescription $sd[0], $sd[1])) }
     $timer = New-Object Windows.Threading.DispatcherTimer
     $timer.Interval = [TimeSpan]::FromMilliseconds(250)
-    $timer.Add_Tick({ try { Update-Worker; Step-Choose } catch { Write-AppLog "Update: $($_.Exception.Message)" } })
+    $timer.Add_Tick({ try { Update-Worker; Step-Choose; Step-Disc } catch { Write-AppLog "Update: $($_.Exception.Message)" } })
     $window.Add_ContentRendered({
         Invoke-Safely {
             Read-Catalogue

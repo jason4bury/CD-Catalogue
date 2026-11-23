@@ -6,7 +6,7 @@
 
 A searchable list of your CDs, with artist, album, year and cover.
 
-![Version](https://img.shields.io/badge/version-v1.01-blue) ![Platform](https://img.shields.io/badge/platform-Windows-0078D6) ![PowerShell](https://img.shields.io/badge/PowerShell-5.1-5391FE) ![Licence](https://img.shields.io/badge/licence-MIT-green) ![Last commit](https://img.shields.io/github/last-commit/jason4bury/CD-Catalogue)
+![Version](https://img.shields.io/badge/version-v1.02-blue) ![Platform](https://img.shields.io/badge/platform-Windows-0078D6) ![PowerShell](https://img.shields.io/badge/PowerShell-5.1-5391FE) ![Licence](https://img.shields.io/badge/licence-MIT-green) ![Last commit](https://img.shields.io/github/last-commit/jason4bury/CD-Catalogue)
 
 
 ## ✨ Features
@@ -19,9 +19,10 @@ CD Catalogue is a PowerShell/WPF tool that keeps a searchable list of your physi
 - **Which version is yours?**: MusicBrainz often has several versions of a CD with one barcode (other countries, reissues, labels, box sets). When it does, the app asks which you have once the look-ups finish, showing each one's cover, date, country, label, catalogue number, format and tracks. **Choose the version** shows them again at any time.
 - **MusicBrainz account (optional)**: look-ups never need one. With one, **Add to MusicBrainz** opens MusicBrainz's Add release page with a not-found CD's barcode filled in, and **MB collection** sends your CDs to a collection in your account (sign in once with an application you register in your MusicBrainz account; the sign-in is kept encrypted for your Windows account, and your password is never seen by the app).
 - **CDs with no barcode**: Add by hand, with Look up by artist and album.
-- **Artists, like a discography**: the **Artists** view lists every artist with how many CDs you have and the years they span; pick one to see all their albums together, oldest first, with their genres and labels.
+- **Artists, like a discography**: the **Artists** view lists every artist with how many CDs you have and the years they span, starting on **All artists** (every CD in artist order); pick one to see all their albums together, oldest first, with their genres and labels.
 - **MB or Hand**: a mark on every cover and list row shows whether the CD's details came from MusicBrainz (**MB**) or were entered by hand (**Hand**). The key at the top shows how many of each; click one to show only those CDs. The CSV and HTML report say so too.
 - **Search by field**: search everything, or pick one thing with the button in the search box (artist, album, year, label, genre, barcode or notes). You can also type them and mix them, such as `year:1990-1999 label:"little wheel"`. A year can be one year, a range (1990-1999) or a decade (1990s).
+- **The CD's label**: the disc beside the cover shows a photo of the CD itself when the Cover Art Archive has one.
 - **A wall of covers**: your collection as album art, or as a sortable list, in the app's own teal and amber look with its own window frame.
 - **More about the CD and artist**: the CD's track listing with times, when the album first came out, the pressing's label and catalogue number, format, genres and the album's Wikipedia introduction; beside it the artist: where they're from, when they formed or were born, genres, the band's members with their years, the Wikipedia introduction, and links to MusicBrainz, Wikipedia, Discogs and their own site. It's kept, so it opens at once next time.
 - **Export CSV**: saves the list (or what your search found) as a CSV file for Excel and other spreadsheets.
@@ -47,7 +48,7 @@ CD Catalogue is a PowerShell/WPF tool that keeps a searchable list of your physi
 
 ## 📦 Installation
 
-1. Download `CD-Catalogue-v1.01.zip` from the [latest release](../../releases/latest) and unzip it wherever you like to keep it.
+1. Download `CD-Catalogue-v1.02.zip` from the [latest release](../../releases/latest) and unzip it wherever you like to keep it.
 2. Double-click **CD Catalogue.cmd** in the unzipped folder. It makes a **CD Catalogue** shortcut there and in the Start menu, and starts the tool. From then on, use the shortcut, the Start menu or a pinned taskbar button.
 
 Nothing is installed and no Windows settings are changed. The shortcut runs the script with PowerShell's execution policy bypassed for that run only.

@@ -12,6 +12,7 @@
       "CD Catalogue.cmd": "release\\CD Catalogue.cmd",
       "assets\\CD-Catalogue.ico": "assets\\CD-Catalogue.ico",
       "assets\\CD-Catalogue.png": "assets\\CD-Catalogue.png",
+      "assets\\blank-cd.png": "assets\\blank-cd.png",
       "README.md": "README.md",
       "CHANGELOG.md": "CHANGELOG.md",
       "LICENSE": "LICENSE"

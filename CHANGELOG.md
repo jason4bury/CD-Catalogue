@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.02] - 2026-11-23
+### Changed
+- **Artists** opens on **All artists** at the top of the list: every CD, in artist order ("The" skipped) and then
+  by year, with the artist under each cover. Pick an artist to see just theirs, as before.
+- In **Which version is yours?** the **Page** button is now **See on MusicBrainz**.
+
+### Added
+- **The CD's label on the disc**: when the Cover Art Archive has a photo of the disc itself (its "Medium"
+  picture), the disc beside the cover shows it; otherwise it's a plain blank CD (it used to show the cover).
+  Each CD from MusicBrainz is checked in the background, trying the other versions with the same barcode when
+  its own has no disc photo, and a CD with none is checked again a week later.
+- **More about the CD and artist** shows the disc (its label, or a blank CD) beside the cover.
+
 ## [1.01] - 2026-11-23
 ### Added
 - **MB or Hand**: every cover and list row has a mark showing where its details came from: **MB** (MusicBrainz,
