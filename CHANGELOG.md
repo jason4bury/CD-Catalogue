@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.01] - 2026-11-23
+### Added
+- **MB or Hand**: every cover and list row has a mark showing where its details came from: **MB** (MusicBrainz,
+  scanned or found with Look up) or **Hand** (entered by hand). A key at the top shows how many of each, and
+  clicking one shows only those CDs (click again for all). `source:mb` and `source:hand` work in the search box.
+- The details panel says where the CD's details came from, the list has a sortable **From** column, and the CSV
+  and HTML report have a **Details from** / **From** column.
+- **HTML report**: hover over an album for a card with its details (and its tracks, once More about the CD and
+  artist has been opened for it).
+- **HTML report**: hover over a cover to see it big (300 px) beside the pointer. Covers are saved at that size
+  in the report, so it's a little larger than before.
+
 ## [1.00] - 2026-11-22
 First release.
 

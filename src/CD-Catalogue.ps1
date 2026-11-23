@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 # The version lives here and in CHANGELOG.md; Build.cmd stops if they disagree.
 # Two-digit minor: 1.00, 1.01 ... 1.10. The release folder is "CD Catalogue v<version>".
 $script:AppName     = 'CD Catalogue'
-$script:AppVersion  = '1.00'
+$script:AppVersion  = '1.01'
 $script:Description = 'PowerShell/WPF tool for cataloguing a CD collection'
 $script:Copyright   = 'Copyright (c) 2026 Jason Rhodes'
 $script:RepoUrl     = 'https://github.com/jason4bury/CD-Catalogue'
@@ -462,6 +462,8 @@ public class CdItem {
     public string Notes { get; set; }
     public string Added { get; set; }
     public string Mbid { get; set; }       // MusicBrainz release ('-' once looked up and not found)
+    public bool FromMb { get { return !string.IsNullOrEmpty(Mbid) && Mbid != "-"; } }   // details from MusicBrainz, else typed in
+    public string Source { get { return FromMb ? "MusicBrainz" : "By hand"; } }
     public string Shown { get { return Cover != null && Cover != "" && System.IO.File.Exists(Cover) ? Cover : null; } }
     public string Title { get { return Album != null && Album != "" ? Album : "(not found) " + Barcode; } }
 
@@ -858,14 +860,17 @@ CDS WITHOUT A BARCODE
 Add by hand adds one by hand. Look up in the edit box (or Look up online for all of them) finds the year, label, tracks and cover by artist and album.
 
 THE LIST
-Covers shows your CDs as a wall of covers, List as a list, and Artists by artist; the app remembers which. In List, click a column heading to sort (Covers follows the same order). Click a CD to see its cover and details in the panel at the bottom right; Edit changes it (or double-click the CD), Remove takes it off the list, and MusicBrainz opens its page there. Export CSV saves the list (or just the CDs your search found) as a CSV file for Excel and other spreadsheets. HTML report saves it as a page with the covers, to open in any browser, print or share.
+Covers shows your CDs as a wall of covers, List as a list, and Artists by artist; the app remembers which. In List, click a column heading to sort (Covers follows the same order). Click a CD to see its cover and details in the panel at the bottom right; Edit changes it (or double-click the CD), Remove takes it off the list, and MusicBrainz opens its page there. Export CSV saves the list (or just the CDs your search found) as a CSV file for Excel and other spreadsheets. HTML report saves it as a page with the covers, to open in any browser, print or share; hover over a cover there to see it bigger, or over an album for its details (with the tracks, once More about the CD and artist has been opened for it).
 
+
+THE KEY: MB AND HAND
+Every CD has a mark on its cover (and in List's From column): MB when its details came from MusicBrainz (scanned, or found with Look up), Hand when they were entered by hand (added by hand, or a barcode MusicBrainz didn't know, filled in with Edit). The key at the top right shows how many of each; click one to show only those CDs, and click it again to show them all. You can also search source:mb or source:hand. A hand-entered CD becomes MB once Look up (or Look up online) finds it.
 ARTISTS
 Artists lists every artist on the left, with how many CDs you have and the years they span, and shows the one you pick like a discography: all their CDs together, oldest first, with their genres and labels. The search box works here too. Names count as the same artist whatever their capitals, "The" is skipped when they're put in order, and CDs with no artist are listed last. Click a cover to see its details; double-click it to edit it.
 
 SEARCHING
 Type in the search box to find CDs; the search runs a moment after you stop typing. It looks through everything: artist, album, label, genre, barcode, notes, and the year when you type one. The button at its right (All) picks one thing to search instead: Artist, Album, Year, Label, Genre, Barcode or Notes.
-You can also type what to search in the box, and mix them: artist:harbours  year:1997  label:attic  genre:folk  barcode:5000  notes:signed. Put a name with spaces in quotes, such as label:"little wheel". Everything you type has to match, so artist:harbours year:1990-1999 finds that artist's CDs from the 1990s.
+You can also type what to search in the box, and mix them: artist:harbours  year:1997  label:attic  genre:folk  barcode:5000  notes:signed  source:hand. Put a name with spaces in quotes, such as label:"little wheel". Everything you type has to match, so artist:harbours year:1990-1999 finds that artist's CDs from the 1990s.
 A year can be one year (1997), a range (1990-1999, or 1990 to 1999) or a decade (1990s). The status line says how many CDs match.
 
 CSV FILES AND EXCEL
@@ -1646,10 +1651,18 @@ STYLES
               <Border CornerRadius="10">
                 <Border.Background><ImageBrush ImageSource="{Binding Thumb, IsAsync=True}" Stretch="UniformToFill"/></Border.Background>
               </Border>
+              <Border x:Name="Src" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,7,0" CornerRadius="8" Padding="7,1,7,2"
+                      Background="#0C6663" BorderBrush="#40FFFFFF" BorderThickness="1" ToolTip="Details from MusicBrainz">
+                <TextBlock x:Name="SrcText" Text="MB" FontSize="11" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+              </Border>
             </Grid>
           </DockPanel>
         </Border>
         <ControlTemplate.Triggers>
+          <DataTrigger Binding="{Binding FromMb}" Value="False">
+            <Setter TargetName="Src" Property="Background" Value="#F4B740"/><Setter TargetName="Src" Property="ToolTip" Value="Entered by hand"/>
+            <Setter TargetName="SrcText" Property="Text" Value="Hand"/><Setter TargetName="SrcText" Property="Foreground" Value="#2A2210"/>
+          </DataTrigger>
           <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="T" Property="Background" Value="{Hover}"/></Trigger>
           <Trigger Property="IsSelected" Value="True"><Setter TargetName="T" Property="Background" Value="{Select}"/></Trigger>
         </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
@@ -1674,10 +1687,18 @@ STYLES
               <Border CornerRadius="10">
                 <Border.Background><ImageBrush ImageSource="{Binding Thumb, IsAsync=True}" Stretch="UniformToFill"/></Border.Background>
               </Border>
+              <Border x:Name="Src" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,7,0" CornerRadius="8" Padding="7,1,7,2"
+                      Background="#0C6663" BorderBrush="#40FFFFFF" BorderThickness="1" ToolTip="Details from MusicBrainz">
+                <TextBlock x:Name="SrcText" Text="MB" FontSize="11" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+              </Border>
             </Grid>
           </DockPanel>
         </Border>
         <ControlTemplate.Triggers>
+          <DataTrigger Binding="{Binding FromMb}" Value="False">
+            <Setter TargetName="Src" Property="Background" Value="#F4B740"/><Setter TargetName="Src" Property="ToolTip" Value="Entered by hand"/>
+            <Setter TargetName="SrcText" Property="Text" Value="Hand"/><Setter TargetName="SrcText" Property="Foreground" Value="#2A2210"/>
+          </DataTrigger>
           <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="T" Property="Background" Value="{Hover}"/></Trigger>
           <Trigger Property="IsSelected" Value="True"><Setter TargetName="T" Property="Background" Value="{Select}"/></Trigger>
         </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
@@ -1790,6 +1811,20 @@ STYLES
 
     <DockPanel Grid.Column="1" Margin="24,0,18,0">
       <DockPanel DockPanel.Dock="Top" Margin="0,20,130,0" MinHeight="52">
+        <StackPanel x:Name="Key" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+          <Button x:Name="KeyMb" Padding="8,5,12,5" ToolTip="Details from MusicBrainz (scanned or looked up). Click to show only these; click again to show all.">
+            <StackPanel Orientation="Horizontal">
+              <Border CornerRadius="8" Padding="7,1,7,2" Background="#0C6663" VerticalAlignment="Center"><TextBlock Text="MB" FontSize="11" FontWeight="SemiBold" Foreground="#FFFFFF"/></Border>
+              <TextBlock x:Name="KeyMbText" Text="from MusicBrainz" Margin="7,0,0,0" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
+          <Button x:Name="KeyHand" Padding="8,5,12,5" Margin="0" ToolTip="Entered by hand (added by hand, or not found in MusicBrainz and filled in). Click to show only these; click again to show all.">
+            <StackPanel Orientation="Horizontal">
+              <Border CornerRadius="8" Padding="7,1,7,2" Background="#F4B740" VerticalAlignment="Center"><TextBlock Text="Hand" FontSize="11" FontWeight="SemiBold" Foreground="#2A2210"/></Border>
+              <TextBlock x:Name="KeyHandText" Text="entered by hand" Margin="7,0,0,0" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
+        </StackPanel>
         <StackPanel VerticalAlignment="Center">
           <TextBlock x:Name="TxtSummary" FontSize="28" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
           <TextBlock x:Name="TxtTotals" Foreground="{Soft}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
@@ -1851,6 +1886,19 @@ STYLES
                     <Border CornerRadius="7" Background="{Sleeve}"/>
                     <Border CornerRadius="7"><Border.Background><ImageBrush ImageSource="{Binding Thumb, IsAsync=True}" Stretch="UniformToFill"/></Border.Background></Border>
                   </Grid>
+                </DataTemplate></DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn Header="From" Width="70" SortMemberPath="Source" CanUserSort="True">
+                <DataGridTemplateColumn.CellTemplate><DataTemplate>
+                  <Border x:Name="Src" HorizontalAlignment="Left" VerticalAlignment="Center" CornerRadius="8" Padding="7,1,7,2" Background="#0C6663" ToolTip="Details from MusicBrainz">
+                    <TextBlock x:Name="SrcText" Text="MB" FontSize="11" FontWeight="SemiBold" Foreground="#FFFFFF"/>
+                  </Border>
+                  <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding FromMb}" Value="False">
+                      <Setter TargetName="Src" Property="Background" Value="#F4B740"/><Setter TargetName="Src" Property="ToolTip" Value="Entered by hand"/>
+                      <Setter TargetName="SrcText" Property="Text" Value="Hand"/><Setter TargetName="SrcText" Property="Foreground" Value="#2A2210"/>
+                    </DataTrigger>
+                  </DataTemplate.Triggers>
                 </DataTemplate></DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
               <DataGridTextColumn Header="Album" Width="2*" MinWidth="80" Binding="{Binding Title}" ElementStyle="{StaticResource AlbumCell}" SortMemberPath="Album"/>
@@ -1964,6 +2012,10 @@ function Update-Summary {
     $all = @($script:Items)
     $ui = $script:UI
     $artists = @($all | Where-Object Artist | Select-Object -ExpandProperty Artist -Unique).Count
+    $fromMb = @($all | Where-Object { $_.FromMb }).Count
+    $ui.KeyMbText.Text = "from MusicBrainz ($fromMb)"
+    $ui.KeyHandText.Text = "entered by hand ($($all.Count - $fromMb))"
+    $ui.Key.Visibility = if ($all.Count) { 'Visible' } else { 'Collapsed' }
     $ui.TxtSummary.Text = if ($all.Count) { "$($all.Count) CD$(if ($all.Count -ne 1) { 's' }) by $artists artist$(if ($artists -ne 1) { 's' })" } else { 'Your collection' }
     if ($all.Count) {
         $notFound = @($all | Where-Object { -not $_.Album }).Count
@@ -2084,10 +2136,10 @@ $script:SearchField = 'All'
 function Get-SearchParts([string]$Text, [string]$Field) {
     <# The search as a list of { Field; Want }: each typed field:value, and the rest for the button's field. #>
     $parts = New-Object Collections.ArrayList
-    $rx = '(?i)\b(artist|album|year|label|genre|country|barcode|notes?)\s*:\s*("([^"]*)"?|\S*)'
+    $rx = '(?i)\b(artist|album|year|label|genre|country|barcode|notes?|source|from)\s*:\s*("([^"]*)"?|\S*)'
     foreach ($m in [regex]::Matches($Text, $rx)) {
         $want = if ($m.Groups[3].Success) { $m.Groups[3].Value } else { $m.Groups[2].Value }
-        $name = (Get-Culture).TextInfo.ToTitleCase($m.Groups[1].Value.ToLowerInvariant()) -replace '^Note$', 'Notes'
+        $name = (Get-Culture).TextInfo.ToTitleCase($m.Groups[1].Value.ToLowerInvariant()) -replace '^Note$', 'Notes' -replace '^From$', 'Source'
         if ($want.Trim()) { [void]$parts.Add(@{ Field = $name; Want = $want.Trim() }) }
     }
     $rest = ([regex]::Replace($Text, $rx, ' ')).Trim()
@@ -2113,7 +2165,9 @@ function Initialize-Search {
             'Year' { if ($span) { @() } else { @('Year') } }
             default { @($c.Field) }
         }
-        @{ Want = $c.Want; Names = $names; Span = $span; Country = ($c.Field -eq 'All') }
+        $mb = $null   # source: mb / musicbrainz, or hand / manual
+        if ($c.Field -eq 'Source') { $names = @(); $span = $null; $mb = $c.Want -match '^(?i)m' }
+        @{ Want = $c.Want; Names = $names; Span = $span; Country = ($c.Field -eq 'All'); Mb = $mb }
     })
 }
 
@@ -2123,6 +2177,7 @@ function Test-CdSearch($Item) {
         foreach ($n in $c.Names) { if (([string]$Item.$n).IndexOf($c.Want, [StringComparison]::OrdinalIgnoreCase) -ge 0) { $hit = $true; break } }
         if (-not $hit -and $c.Span) { $y = 0; if ([int]::TryParse($Item.Year, [ref]$y) -and $y -ge $c.Span[0] -and $y -le $c.Span[1]) { $hit = $true } }
         if (-not $hit -and $c.Country -and $Item.Country -eq $c.Want) { $hit = $true }
+        if ($null -ne $c.Mb) { $hit = ($Item.FromMb -eq $c.Mb) }
         if (-not $hit) { return $false }
     }
     return $true
@@ -2181,6 +2236,9 @@ function Update-View {
     $script:SearchTest = if ($script:SearchParts.Count) { { param($i) Test-CdSearch $i } } else { $null }
     $view.Filter = if ($script:SearchTest) { [Predicate[object]]$script:SearchTest } else { $null }
     $n = @($view).Count
+    foreach ($k in @(@('KeyMb', 'source:mb'), @('KeyHand', 'source:hand'))) {
+        $script:UI[$k[0]].Background = Get-Brush $(if ($q -eq $k[1]) { 'Select' } else { 'Chip' })
+    }
     if ($script:SearchParts.Count) {
         $said = ($script:SearchParts | ForEach-Object { if ($_.Field -eq 'All') { '"{0}"' -f $_.Want } else { '{0} "{1}"' -f $_.Field.ToLowerInvariant(), $_.Want } }) -join ' and '
         Set-Status "$n CD$(if ($n -ne 1) { 's' }) match$(if ($n -eq 1) { 'es' }) $said."
@@ -2218,7 +2276,7 @@ function Show-Details {
     $ui.DArtist.Text = $i.Artist
     $ui.DMeta.Text = (@($i.Year, $i.Label, $i.Country, $i.Genre,
         $(if ($i.Tracks) { "$($i.Tracks) track$(if ($i.Tracks -ne 1) { 's' })" }), $(if ($i.Discs -gt 1) { "$($i.Discs) discs" }),
-        $(if ($i.Barcode) { "barcode $($i.Barcode)" })) | Where-Object { $_ }) -join '  ·  '
+        $(if ($i.Barcode) { "barcode $($i.Barcode)" }), $(if ($i.FromMb) { 'details from MusicBrainz' } else { 'entered by hand' })) | Where-Object { $_ }) -join '  ·  '
     $ui.DNotes.Text = $i.Notes
 }
 
@@ -2423,8 +2481,9 @@ function Update-Worker {
 
 function Get-HtmlText([string]$Text) { return [Net.WebUtility]::HtmlEncode($Text) }
 
-function Get-ThumbData([string]$Path, [int]$Size = 120) {
-    <# A small JPEG of the cover as a data: address, so the report is one file that works anywhere. #>
+function Get-ThumbData([string]$Path, [int]$Size = 300) {
+    <# A JPEG of the cover as a data: address, so the report is one file that works anywhere. 300 px, so
+       hovering over a cover can show it big as well as small in the table. #>
     $img = Get-Picture $Path $Size
     if (-not $img) { return '' }
     try {
@@ -2437,6 +2496,43 @@ function Get-ThumbData([string]$Path, [int]$Size = 120) {
     } catch { return '' }
 }
 
+function Get-HtmlCard([CdItem]$Item) {
+    <# The card shown when you hover over an album in the report: its details, and the track listing
+       when More about the CD and artist has been opened for it (kept in Info\; nothing is looked up here). #>
+    $h = { param($t) [Net.WebUtility]::HtmlEncode([string]$t) }
+    $facts = [ordered]@{
+        'Year' = $Item.Year; 'Label' = $Item.Label; 'Country' = $(if ($Item.Country) { Get-CountryName $Item.Country })
+        'Genre' = $Item.Genre
+        'Tracks' = $(if ($Item.Tracks) { "$($Item.Tracks)$(if ($Item.Discs -gt 1) { " on $($Item.Discs) discs" })" })
+        'Barcode' = $Item.Barcode; 'Details from' = $(if ($Item.FromMb) { 'MusicBrainz' } else { 'entered by hand' }); 'Notes' = $Item.Notes
+    }
+    $info = $null
+    if ($Item.FromMb) {
+        $cache = Join-Path (Join-Path $script:DataDir 'Info') "$($Item.Mbid).json"
+        if (Test-Path -LiteralPath $cache) { try { $info = Get-Content -LiteralPath $cache -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $info = $null } }
+    }
+    if ($info -and $info.Cd) {
+        if ($info.Cd.First -and $info.Cd.First -ne $info.Cd.Date) { $facts['First out'] = Format-InfoDate ([string]$info.Cd.First) }
+        if (@($info.Cd.Labels).Count) { $facts['Label'] = (@($info.Cd.Labels) -join ', ') }
+    }
+    $sb = New-Object Text.StringBuilder
+    [void]$sb.Append("<b>$(& $h $Item.Title)</b><i>$(& $h $Item.Artist)</i><dl>")
+    foreach ($k in $facts.Keys) { if ($facts[$k]) { [void]$sb.Append("<dt>$k</dt><dd>$(& $h $facts[$k])</dd>") } }
+    [void]$sb.Append('</dl>')
+    if ($info -and $info.Cd -and @($info.Cd.Discs).Count) {
+        $discs = @($info.Cd.Discs)
+        [void]$sb.Append('<ol>')
+        $d = 0
+        foreach ($disc in $discs) {
+            $d++
+            if ($discs.Count -gt 1) { [void]$sb.Append("<li class=""dh"">Disc $d$(if ($disc.Name) { ': ' + (& $h $disc.Name) })</li>") }
+            foreach ($t in @($disc.Tracks)) { [void]$sb.Append("<li><span>$(& $h $t.No)</span>$(& $h $t.Title)<em>$(& $h $t.Length)</em></li>") }
+        }
+        [void]$sb.Append('</ol>')
+    }
+    return $sb.ToString()
+}
+
 function Export-Html([string]$Path, [array]$Rows) {
     $artists = @($Rows | Where-Object Artist | Select-Object -ExpandProperty Artist -Unique).Count
     $sb = New-Object Text.StringBuilder
@@ -2445,7 +2541,7 @@ function Export-Html([string]$Path, [array]$Rows) {
         $cover = if ($thumb) { "<img src=""$thumb"" alt="""">" } else { '<span class="none"></span>' }
         $mb = if ($i.Mbid -and $i.Mbid -ne '-') { "<a href=""https://musicbrainz.org/release/$($i.Mbid)"">$(Get-HtmlText $i.Title)</a>" } else { Get-HtmlText $i.Title }
         $tracks = if ($i.Tracks) { [string]$i.Tracks + $(if ($i.Discs -gt 1) { " ($($i.Discs) discs)" }) } else { '' }
-        [void]$sb.AppendLine("<tr><td class=""c"">$cover</td><td>$(Get-HtmlText $i.Artist)</td><td class=""al"">$mb</td><td>$(Get-HtmlText $i.Year)</td><td>$(Get-HtmlText $i.Label)</td><td>$(Get-HtmlText $i.Country)</td><td>$(Get-HtmlText $i.Genre)</td><td class=""n"">$tracks</td><td class=""bc"">$(Get-HtmlText $i.Barcode)</td><td class=""nt"">$(Get-HtmlText $i.Notes)</td></tr>")
+        [void]$sb.AppendLine("<tr><td class=""c"">$cover</td><td>$(Get-HtmlText $i.Artist)</td><td class=""al"">$mb<div class=""card"">$(Get-HtmlCard $i)</div></td><td>$(Get-HtmlText $i.Year)</td><td>$(Get-HtmlText $i.Label)</td><td>$(Get-HtmlText $i.Country)</td><td>$(Get-HtmlText $i.Genre)</td><td class=""n"">$tracks</td><td class=""bc"">$(Get-HtmlText $i.Barcode)</td><td class=""nt"">$(Get-HtmlText $i.Notes)</td><td>$(if ($i.FromMb) { '<span class=""k mb"">MB</span>' } else { '<span class=""k hand"">Hand</span>' })</td></tr>")
     }
     $title = "CD catalogue, $((Get-Date).ToString('d MMMM yyyy'))"
     $html = @"
@@ -2466,18 +2562,59 @@ td.c { width:52px; } td.c img, td.c .none { width:44px; height:44px; object-fit:
 td.al { font-weight:600; } td.n, td.bc { white-space:nowrap; } td.nt { color:var(--soft); }
 a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
 .foot { color:var(--soft); margin-top:12px; font-size:12px; }
-@media print { body { padding:0; background:#fff; color:#000; } input { display:none; } table { border:0; } tr { break-inside:avoid; } }
+td .card { display:none; }
+#card { position:fixed; width:340px; max-height:80vh; overflow:hidden; background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:12px;
+  box-shadow:0 10px 32px rgba(0,0,0,.3); padding:14px 16px; display:none; pointer-events:none; z-index:10; font-weight:400; }
+#card img { float:left; width:84px; height:84px; object-fit:cover; border-radius:6px; margin:0 12px 8px 0; }
+#card b { display:block; font-size:16px; } #card i { display:block; font-style:normal; color:var(--accent); margin-bottom:8px; }
+#card dl { clear:both; display:grid; grid-template-columns:auto 1fr; gap:2px 12px; margin:0; } #card dt { color:var(--soft); } #card dd { margin:0; }
+#card ol { list-style:none; margin:10px 0 0; padding:8px 0 0; border-top:1px solid var(--line); columns:1; font-size:13px; }
+#card li { display:flex; gap:8px; } #card li span { color:var(--soft); min-width:18px; } #card li em { margin-left:auto; font-style:normal; color:var(--soft); }
+#card li.dh { font-weight:600; margin-top:4px; }
+#big { position:fixed; width:300px; height:300px; object-fit:cover; border-radius:10px; box-shadow:0 10px 32px rgba(0,0,0,.35); background:var(--card); display:none; pointer-events:none; z-index:9; }
+td.c img { cursor:zoom-in; }
+.k { display:inline-block; padding:1px 7px 2px; border-radius:8px; font-size:11px; font-weight:600; } .k.mb { background:#0C6663; color:#FFFFFF; } .k.hand { background:#F4B740; color:#2A2210; }
+@media print { body { padding:0; background:#fff; color:#000; } input, #big, #card { display:none !important; } table { border:0; } tr { break-inside:avoid; } }
 </style></head><body>
 <h1>$(Get-HtmlText $title)</h1>
 <p class="sum">$($Rows.Count) CD$(if ($Rows.Count -ne 1) { 's' }) by $artists artist$(if ($artists -ne 1) { 's' })</p>
 <input id="q" type="search" placeholder="Search" aria-label="Search">
-<table id="t"><thead><tr><th></th><th>Artist</th><th>Album</th><th>Year</th><th>Label</th><th>Country</th><th>Genre</th><th>Tracks</th><th>Barcode</th><th>Notes</th></tr></thead>
+<table id="t"><thead><tr><th></th><th>Artist</th><th>Album</th><th>Year</th><th>Label</th><th>Country</th><th>Genre</th><th>Tracks</th><th>Barcode</th><th>Notes</th><th>From</th></tr></thead>
 <tbody>
 $($sb.ToString())</tbody></table>
 <p class="foot">Made by CD Catalogue v$script:AppVersion. Details from MusicBrainz, covers from the Cover Art Archive.</p>
 <script>
+// Hovering over a cover shows it big beside the pointer.
+var big = document.createElement('img'); big.id = 'big'; big.alt = ''; document.body.appendChild(big);
+function placeBig(e) {
+  var x = e.clientX + 20, y = e.clientY - 150;
+  if (x + 310 > window.innerWidth) x = e.clientX - 320;
+  big.style.left = Math.max(8, x) + 'px'; big.style.top = Math.max(8, Math.min(y, window.innerHeight - 310)) + 'px';
+}
+var tb = document.querySelector('#t tbody');
+// Hovering over an album shows a card with its details (and tracks, when known).
+var card = document.createElement('div'); card.id = 'card'; document.body.appendChild(card);
+function placeCard(e) {
+  var w = card.offsetWidth, h = card.offsetHeight, x = e.clientX + 20, y = e.clientY - 40;
+  if (x + w + 10 > window.innerWidth) x = e.clientX - w - 20;
+  card.style.left = Math.max(8, x) + 'px'; card.style.top = Math.max(8, Math.min(y, window.innerHeight - h - 8)) + 'px';
+}
+function albumCell(el) { while (el && el !== tb) { if (el.tagName === 'TD') return el.className === 'al' ? el : null; el = el.parentNode; } return null; }
+tb.addEventListener('mouseover', function (e) {
+  var td = albumCell(e.target); if (!td) return;
+  var img = td.parentNode.querySelector('td.c img');
+  card.innerHTML = (img ? '<img src="' + img.src + '" alt="">' : '') + td.querySelector('.card').innerHTML;
+  card.style.display = 'block'; placeCard(e);
+});
+tb.addEventListener('mousemove', function (e) { if (card.style.display === 'block') { if (albumCell(e.target)) placeCard(e); else card.style.display = 'none'; } });
+tb.addEventListener('mouseleave', function () { card.style.display = 'none'; big.style.display = 'none'; });
+tb.addEventListener('mouseover', function (e) { if (e.target.tagName === 'IMG' && e.target.parentNode.className === 'c') { big.src = e.target.src; big.style.display = 'block'; placeBig(e); } });
+tb.addEventListener('mousemove', function (e) { if (big.style.display === 'block') placeBig(e); });
+tb.addEventListener('mouseout', function (e) { if (e.target.tagName === 'IMG') big.style.display = 'none'; });
 var q = document.getElementById('q'), rows = Array.prototype.slice.call(document.querySelectorAll('#t tbody tr'));
-q.addEventListener('input', function () { var s = q.value.toLowerCase(); rows.forEach(function (r) { r.style.display = r.textContent.toLowerCase().indexOf(s) >= 0 ? '' : 'none'; }); });
+function shownText(r) { var c = r.cloneNode(true); c.querySelectorAll('.card').forEach(function (x) { x.remove(); }); return c.textContent.toLowerCase(); }
+rows.forEach(function (r) { r.dataset.find = shownText(r); });
+q.addEventListener('input', function () { var s = q.value.toLowerCase(); rows.forEach(function (r) { r.style.display = r.dataset.find.indexOf(s) >= 0 ? '' : 'none'; }); });
 document.querySelectorAll('#t th').forEach(function (th, n) {
   if (!n) return;
   th.addEventListener('click', function () {
@@ -2525,7 +2662,7 @@ function Export-List([ValidateSet('Csv', 'Html')][string]$Kind) {
         $rows | Select-Object @{ n = 'Artist'; e = { Get-ExcelText $_.Artist } }, @{ n = 'Album'; e = { Get-ExcelText $_.Album } },
             @{ n = 'Year'; e = { if ($_.Year -match '^[1-9]\d{3}$') { $_.Year } else { Get-ExcelText $_.Year } } },
             @{ n = 'Label'; e = { Get-ExcelText $_.Label } }, @{ n = 'Country'; e = { Get-ExcelText $_.Country } }, @{ n = 'Genre'; e = { Get-ExcelText $_.Genre } },
-            Tracks, Discs, @{ n = 'Barcode'; e = { Get-ExcelText $_.Barcode -Always } }, @{ n = 'Notes'; e = { Get-ExcelText $_.Notes } }, @{ n = 'MusicBrainz'; e = { if ($_.Mbid -and $_.Mbid -ne '-') { "https://musicbrainz.org/release/$($_.Mbid)" } } } |
+            Tracks, Discs, @{ n = 'Barcode'; e = { Get-ExcelText $_.Barcode -Always } }, @{ n = 'Notes'; e = { Get-ExcelText $_.Notes } }, @{ n = 'Details from'; e = { $_.Source } }, @{ n = 'MusicBrainz'; e = { if ($_.Mbid -and $_.Mbid -ne '-') { "https://musicbrainz.org/release/$($_.Mbid)" } } } |
             Export-Csv -LiteralPath $dlg.FileName -NoTypeInformation -Encoding UTF8
         Set-Status "Saved $($rows.Count) CD$(if ($rows.Count -ne 1) { 's' }) to $($dlg.FileName)" 'Good'
     }
@@ -2550,7 +2687,7 @@ try {
     $icon = Get-AssetImage 'CD-Catalogue.ico'
     if ($icon) { $window.Icon = $icon }
     $ui = @{}
-    foreach ($n in 'BtnCsv', 'BtnReport', 'BtnCollection', 'BtnLook', 'BtnHelp', 'BtnAbout', 'TxtStatus', 'Progress', 'TxtSearch', 'TxtHint', 'BtnField', 'BtnLookup', 'BtnAdd', 'TxtSummary', 'TxtTotals',
+    foreach ($n in 'BtnCsv', 'BtnReport', 'BtnCollection', 'BtnLook', 'BtnHelp', 'BtnAbout', 'TxtStatus', 'Progress', 'TxtSearch', 'TxtHint', 'BtnField', 'Key', 'KeyMb', 'KeyHand', 'KeyMbText', 'KeyHandText', 'BtnLookup', 'BtnAdd', 'TxtSummary', 'TxtTotals',
                    'TxtBarcode', 'BtnScan', 'BtnBatch', 'TxtScanNote', 'Grid', 'BtnEdit', 'BtnRemove', 'BtnMb', 'BtnInfo', 'BtnVersions', 'DNoCover', 'DCover', 'DDisc', 'DAlbum', 'DArtist', 'DMeta', 'DNotes',
                    'ViewCovers', 'ViewList', 'ViewArtists', 'Wall', 'ListCard', 'ArtistCard', 'ArtistList', 'ArtCount', 'ArtName', 'ArtMeta', 'Disco',
                    'Empty', 'EmptyTitle', 'EmptyText', 'Details') { $ui[$n] = $window.FindName($n) }
@@ -2647,6 +2784,10 @@ try {
     $ui.ViewArtists.Add_Checked({ & $setView 'Artists' })
     $ui.TxtBarcode.Add_TextChanged({ $ui.TxtScanNote.Visibility = if ($ui.TxtBarcode.Text) { 'Collapsed' } else { 'Visible' } })
     $ui.BtnField.Add_Click({ Invoke-Safely { Show-FieldMenu } })
+    # The key: click a kind to show only those CDs, click it again to show all.
+    $ui.KeyMb.Tag = 'source:mb'; $ui.KeyHand.Tag = 'source:hand'
+    $keyClick = { $ui.TxtSearch.Text = if ($ui.TxtSearch.Text.Trim() -eq $this.Tag) { '' } else { $this.Tag }; Invoke-Safely { Update-View } }
+    $ui.KeyMb.Add_Click($keyClick); $ui.KeyHand.Add_Click($keyClick)
     # The search runs a moment after you stop typing, so a big collection isn't searched at every letter.
     $searchWait = New-Object Windows.Threading.DispatcherTimer
     $searchWait.Interval = [TimeSpan]::FromMilliseconds(220)
