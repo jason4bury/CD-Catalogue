@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.06] - 2026-11-23
+### Added
+- **Read CD**: looks up the CD in this PC's drive with no barcode needed. The disc's table of contents gives its
+  MusicBrainz Disc ID (and track layout, for near matches), and the CD is added like a scanned one, with the
+  version picker when several pressings match. Nothing is ripped or copied; CDs already in the catalogue are
+  pointed out.
+
 ## [1.05] - 2026-11-23
 ### Changed
 - The examples for Kept places (in Help, the README and the Places... box) are general ones: Lounge, Spare room, Car.

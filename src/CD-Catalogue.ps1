@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 # The version lives here and in CHANGELOG.md; Build.cmd stops if they disagree.
 # Two-digit minor: 1.00, 1.01 ... 1.10. The release folder is "CD Catalogue v<version>".
 $script:AppName     = 'CD Catalogue'
-$script:AppVersion  = '1.05'
+$script:AppVersion  = '1.06'
 $script:Description = 'PowerShell/WPF tool for cataloguing a CD collection'
 $script:Copyright   = 'Copyright (c) 2026 Jason Rhodes'
 $script:RepoUrl     = 'https://github.com/jason4bury/CD-Catalogue'
@@ -671,7 +671,8 @@ function Read-Catalogue {
 
 # Look-ups run in the background (a runspace), one a second or so: MusicBrainz asks for at most one
 # request a second and a name for the app, and answers 503 when it's busy (then we wait and retry).
-# A job is a barcode ({ Barcode }, or { Barcode; ListOnly } for just its versions), one version to switch
+# A job is a barcode ({ Barcode }, or { Barcode; ListOnly } for just its versions), a disc read from the
+# drive ({ DiscId; Toc }), one version to switch
 # a CD to ({ Id; ReleaseId }) or a CD to complete ({ Id; Artist; Album; NeedCover }).
 $script:LookupScan = {
     param($Sync, [string]$CoverDir, [string]$Agent)
@@ -706,17 +707,25 @@ $script:LookupScan = {
         while (-not $Sync.Cancel) {
             $j = $null
             if (-not $Sync.Queue.TryDequeue([ref]$j)) { if ($Sync.StopWhenEmpty) { break }; Start-Sleep -Milliseconds 250; continue }
-            $Sync.Now = if ($j.Barcode) { "barcode $($j.Barcode)" } else { "$($j.Artist) - $($j.Album)" }
+            $Sync.Now = if ($j.Barcode) { "barcode $($j.Barcode)" } elseif ($j.DiscId) { 'the CD in the drive' } else { "$($j.Artist) - $($j.Album)" }
             $res = @{ Job = $j; Found = $false; Failed = $false; Matches = 0 }
             try {
-                if ($j.Barcode -or $j.ReleaseId) {
+                if ($j.Barcode -or $j.ReleaseId -or $j.DiscId) {
                     if ($j.ReleaseId) {
                         # The version you picked.
                         $rel = Get-Mb ("https://musicbrainz.org/ws/2/release/$($j.ReleaseId)?inc=artist-credits+labels+media+release-groups&fmt=json")
                         $res.Matches = 1
                     } else {
-                        $r = Get-Mb ('https://musicbrainz.org/ws/2/release/?fmt=json&limit=25&query=barcode:' + [Uri]::EscapeDataString($j.Barcode))
-                        $all = @($r.releases | Where-Object { [int]$_.score -ge 90 })
+                        if ($j.DiscId) {
+                            # The CD in the drive: its Disc ID, with its track layout so a near match is found too.
+                            $r = $null
+                            try { $r = Get-Mb ("https://musicbrainz.org/ws/2/discid/$($j.DiscId)?toc=$($j.Toc)&cdstubs=no&inc=artist-credits+labels+release-groups&fmt=json") }
+                            catch { if ("$($_.Exception.Message)" -notmatch '404') { throw } }
+                            $all = @(if ($r) { @($r.releases) | Where-Object { $_ } })
+                        } else {
+                            $r = Get-Mb ('https://musicbrainz.org/ws/2/release/?fmt=json&limit=25&query=barcode:' + [Uri]::EscapeDataString($j.Barcode))
+                            $all = @($r.releases | Where-Object { [int]$_.score -ge 90 })
+                        }
                         $res.Matches = $all.Count
                         # Several versions (pressings) can share a barcode: start with a CD one, and offer the others.
                         $cds = @($all | Where-Object { @($_.media | Where-Object { $_.format -match 'CD' }).Count })
@@ -727,6 +736,7 @@ $script:LookupScan = {
                     if ($rel) {
                         $res.Found = $true
                         $res.Mbid = [string]$rel.id
+                        $res.Barcode = [string]$rel.barcode
                         $res.Album = [string]$rel.title
                         $res.Artist = (@($rel.'artist-credit' | ForEach-Object { [string]$_.name + [string]$_.joinphrase }) -join '').Trim()
                         if ([string]$rel.date -match '^(\d{4})') { $res.Year = $Matches[1] }
@@ -886,6 +896,9 @@ CD Catalogue keeps a searchable list of your CDs: artist, album, year, label, nu
 ADDING CDS BY BARCODE
 Click in the barcode box at the top and scan the barcode on the back of the CD with a USB or Bluetooth barcode scanner (it types the number and presses Enter for you), or type the number under the bars and press Enter. The details come from MusicBrainz and the cover from the Cover Art Archive (both free, no account). You can scan one CD after another: each is looked up in turn, about one a second. A CD already in the list is pointed out instead of being added twice. A barcode MusicBrainz doesn't know is still added, as "(not found)", so you can fill it in with Edit.
 
+
+READ CD (THE CD IN THE DRIVE)
+With a CD in this PC's drive, press Read CD: no barcode needed. The app reads where each track starts on the disc and works out its MusicBrainz Disc ID, which singles out the pressing, then looks it up and adds it like a scanned CD (with Which version is yours? when a few pressings share the same tracks). Nothing is ripped or copied, and a CD already in your catalogue is pointed out. If MusicBrainz doesn't know the disc, scan its barcode or use Add by hand.
 SCANNING SEVERAL CDS FIRST
 Scan several lets you scan a pile of CDs before anything is looked up. Press Scan several, scan the first CD, then the next, and so on: each barcode goes on a waiting list (the status line shows them, and the Search button how many). When you've scanned them all, press Search (or press Enter in the empty barcode box, or type search). They're then looked up one after another, about one a second, and each appears in the list as it's found. A CD already in your catalogue, or already on the list, is pointed out as you scan it. Cancel (or Esc) leaves Scan several and forgets the list.
 
@@ -1943,6 +1956,8 @@ STYLES
             <Path DockPanel.Dock="Left" Width="26" Height="20" VerticalAlignment="Center" Margin="0,0,11,0" Stroke="{Ink}" StrokeThickness="1.8"
                   Data="M1,0 V20 M5,0 V20 M8,0 V20 M13,0 V20 M16,0 V20 M19,0 V20 M25,0 V20"/>
             <Button x:Name="BtnScan" DockPanel.Dock="Right" Content="Add CD" Style="{StaticResource Accent}" Margin="8,0,0,0" MinWidth="86"/>
+            <Button x:Name="BtnDisc" DockPanel.Dock="Right" Content="Read CD" Margin="8,0,0,0" Padding="13,7"
+                    ToolTip="Look up the CD in this PC's drive by its track layout (MusicBrainz Disc ID): no barcode needed"/>
             <Button x:Name="BtnBatch" DockPanel.Dock="Right" Content="Scan several" Margin="8,0,0,0" Padding="13,7"
                     ToolTip="Scan a pile of CDs first, then press Search to look them all up, one after another"/>
             <Grid>
@@ -2955,6 +2970,76 @@ STYLES
     [void]$w.ShowDialog()
 }
 
+# ---------------------------------------------------------------------------
+#  Read CD: the CD in the drive, by its MusicBrainz Disc ID. Windows reads the
+#  disc's table of contents (where each track starts); the Disc ID is worked out
+#  from it the way MusicBrainz does. Nothing is ripped or copied.
+# ---------------------------------------------------------------------------
+if (-not ('CdToc' -as [type])) {
+    Add-Type @"
+using System; using System.Runtime.InteropServices; using Microsoft.Win32.SafeHandles;
+public static class CdToc {
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern SafeFileHandle CreateFile(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool DeviceIoControl(SafeFileHandle h, uint code, IntPtr inBuf, uint inSize, byte[] outBuf, uint outSize, out uint returned, IntPtr overlapped);
+    // IOCTL_CDROM_READ_TOC: the CDROM_TOC structure (4 bytes, then 8 bytes for each track and the lead-out).
+    public static byte[] Read(string letter) {
+        using (SafeFileHandle h = CreateFile(@"\\.\" + letter.TrimEnd('\\', ':') + ":", 0x80000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero)) {
+            if (h.IsInvalid) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            byte[] buf = new byte[804]; uint got;
+            if (!DeviceIoControl(h, 0x00024000, IntPtr.Zero, 0, buf, (uint)buf.Length, out got, IntPtr.Zero)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            return buf;
+        }
+    }
+}
+"@
+}
+
+function Get-DiscId([string]$Letter) {
+    <# The MusicBrainz Disc ID and track layout (toc) of the CD in a drive, from its table of contents. #>
+    $b = [CdToc]::Read($Letter)
+    $first = [int]$b[2]; $last = [int]$b[3]
+    if ($last -lt $first -or $last -gt 99) { throw 'The disc has no tracks that can be read.' }
+    $offset = @{}; $data = @{}
+    for ($n = 0; $n -le ($last - $first + 1); $n++) {
+        $p = 4 + 8 * $n
+        $t = [int]$b[$p + 2]
+        $offset[$t] = ([int]$b[$p + 5] * 60 + [int]$b[$p + 6]) * 75 + [int]$b[$p + 7]
+        $data[$t] = ([int]$b[$p + 1] -band 0x04) -ne 0
+    }
+    $leadOut = $offset[0xAA]
+    # An enhanced CD ends with a data track: MusicBrainz counts the music only, ending 11,400 frames before it.
+    if ($last -gt $first -and $data[$last]) { $leadOut = $offset[$last] - 11400; $last-- }
+    if (-not @($first..$last | Where-Object { -not $data[$_] }).Count) { throw 'This is a data disc, not a music CD.' }
+    $sb = New-Object Text.StringBuilder
+    [void]$sb.Append($first.ToString('X2')).Append($last.ToString('X2')).Append(([int]$leadOut).ToString('X8'))
+    for ($t = 1; $t -le 99; $t++) { [void]$sb.Append($(if ($t -ge $first -and $t -le $last) { ([int]$offset[$t]).ToString('X8') } else { '00000000' })) }
+    $sha = [Security.Cryptography.SHA1]::Create()
+    $id = [Convert]::ToBase64String($sha.ComputeHash([Text.Encoding]::ASCII.GetBytes($sb.ToString()))).Replace('+', '.').Replace('/', '_').Replace('=', '-')
+    $toc = (@($first, $last, $leadOut) + @($first..$last | ForEach-Object { $offset[$_] })) -join '+'
+    return @{ Id = $id; Toc = $toc; Tracks = $last - $first + 1 }
+}
+
+function Read-DriveCd {
+    <# Read CD: looks up the CD in the drive (the first drive with a CD in it). #>
+    $drives = @([IO.DriveInfo]::GetDrives() | Where-Object { $_.DriveType -eq 'CDRom' })
+    if (-not $drives.Count) { [void](Show-AppMessage "This PC has no CD drive. Scan or type the CD's barcode instead."); return }
+    $ready = @($drives | Where-Object { $_.IsReady })
+    if (-not $ready.Count) { Set-Status "Put a CD in the drive ($(@($drives | ForEach-Object { $_.Name.TrimEnd('\') }) -join ', ')), then press Read CD." 'Warn'; return }
+    $disc = $null
+    foreach ($d in $ready) {
+        try { $disc = Get-DiscId $d.Name; break }
+        catch { $why = $_.Exception.Message; Write-AppLog "Read CD $($d.Name): $why" }
+    }
+    if (-not $disc) { Set-Status "Couldn't read the CD in the drive: $why" 'Warn'; return }
+    if (@($script:Pending | Where-Object { $_ -eq "disc:$($disc.Id)" }).Count) { Set-Status 'That CD is being looked up already.'; return }
+    $script:Pending += "disc:$($disc.Id)"
+    Write-AppLog "Read CD: Disc ID $($disc.Id), $($disc.Tracks) tracks"
+    Send-Lookup @{ DiscId = $disc.Id; Toc = $disc.Toc }
+    Set-Status "Looking up the CD in the drive ($($disc.Tracks) tracks)..."
+}
+
 # Scan several: barcodes are collected first, then looked up one after another.
 $script:Batching = $false
 $script:Batch = @()
@@ -3019,7 +3104,32 @@ function Update-Worker {
     finally { [Threading.Monitor]::Exit($s.Items.SyncRoot) }
     foreach ($r in $new) {
         $j = $r.Job
-        if ($j.Barcode) {
+        if ($j.DiscId) {
+            # The CD in the drive.
+            $script:Pending = @($script:Pending | Where-Object { $_ -ne "disc:$($j.DiscId)" })
+            if ($r.Failed) { Write-AppLog "Disc $($j.DiscId): $($r.Error)"; Set-Status "Couldn't look the CD up just now: $($r.Error) Press Read CD again in a moment." 'Warn'; continue }
+            if (-not $r.Found) {
+                Set-Status "MusicBrainz doesn't know this CD from its tracks. Scan its barcode instead, or use Add by hand." 'Warn'
+                [void](Show-AppMessage ("MusicBrainz doesn't know this CD from its track layout (its Disc ID is $($j.DiscId)).`n`n" +
+                    "Scan or type its barcode instead, or use Add by hand. If you add it to MusicBrainz, the next person who reads it will find it."))
+                continue
+            }
+            $dup = @($script:Items | Where-Object { $_.Mbid -eq $r.Mbid -or ($r.Barcode -and $_.Barcode -eq $r.Barcode) }) | Select-Object -First 1
+            if ($dup) {
+                $script:UI.Grid.SelectedItem = $dup; $script:UI.Grid.ScrollIntoView($dup)
+                Set-Status "Already in your catalogue: $($dup.Artist) - $($dup.Title)." 'Warn'
+                continue
+            }
+            $i = New-Object CdItem
+            $i.Id = [guid]::NewGuid().ToString('N'); $i.Added = (Get-Date).ToString('s'); $i.Barcode = $r.Barcode
+            $i.Artist = $r.Artist; $i.Album = $r.Album; $i.Year = $r.Year; $i.Label = $r.Label; $i.Country = $r.Country
+            $i.Tracks = [int]$r.Tracks; $i.Discs = [int]$r.Discs; $i.Cover = $r.Cover; $i.Mbid = $r.Mbid
+            $w.Added++
+            Set-Status "Added $($i.Artist) - $($i.Album)$(if ($i.Year) { " ($($i.Year))" }) from the CD in the drive$(if ($r.Matches -gt 1) { ". MusicBrainz has $($r.Matches) versions with this track layout: you'll be asked which is yours" })." 'Good'
+            if ($r.Versions) { $script:Versions[$i.Id] = $r.Versions; $script:ToChoose += $i.Id }
+            $script:Items.Add($i)
+            $script:UI.Grid.SelectedItem = $i; $script:UI.Grid.ScrollIntoView($i)
+        } elseif ($j.Barcode) {
             $script:Pending = @($script:Pending | Where-Object { $_ -ne $j.Barcode })
             if ($r.Failed) {
                 Write-AppLog "Barcode $($j.Barcode): $($r.Error)"
@@ -3316,7 +3426,7 @@ try {
     if ($icon) { $window.Icon = $icon }
     $ui = @{}
     foreach ($n in 'BtnCsv', 'BtnReport', 'BtnPick', 'BtnStats', 'BtnBackup', 'BtnCollection', 'BtnLook', 'BtnHelp', 'BtnAbout', 'TxtStatus', 'Progress', 'TxtSearch', 'TxtHint', 'BtnField', 'Key', 'KeyMb', 'KeyHand', 'KeyMbText', 'KeyHandText', 'BtnLookup', 'BtnAdd', 'TxtSummary', 'TxtTotals',
-                   'TxtBarcode', 'BtnScan', 'BtnBatch', 'TxtScanNote', 'Grid', 'BtnEdit', 'BtnRemove', 'BtnMb', 'BtnInfo', 'BtnVersions', 'DNoCover', 'DCover', 'DDisc', 'DHub', 'DHole', 'DAlbum', 'DArtist', 'DMeta', 'DNotes',
+                   'TxtBarcode', 'BtnScan', 'BtnBatch', 'BtnDisc', 'TxtScanNote', 'Grid', 'BtnEdit', 'BtnRemove', 'BtnMb', 'BtnInfo', 'BtnVersions', 'DNoCover', 'DCover', 'DDisc', 'DHub', 'DHole', 'DAlbum', 'DArtist', 'DMeta', 'DNotes',
                    'ViewCovers', 'ViewList', 'ViewArtists', 'Wall', 'ListCard', 'ArtistCard', 'ArtistList', 'ArtCount', 'ArtName', 'ArtMeta', 'Disco', 'BtnGaps',
                    'Empty', 'EmptyTitle', 'EmptyText', 'Details') { $ui[$n] = $window.FindName($n) }
     # The wall's panel is the app's own type, so it's set here rather than in the XAML.
@@ -3338,6 +3448,7 @@ try {
     # In Scan several the button is Search: a barcode still in the box goes on the list first.
     $ui.BtnScan.Add_Click({ Invoke-Safely { if ($script:Batching -and $ui.TxtBarcode.Text.Trim()) { Add-Barcode }; if ($script:Batching) { Start-BatchSearch } else { Add-Barcode } } })
     $ui.BtnBatch.Add_Click({ Invoke-Safely { Switch-Batch } })
+    $ui.BtnDisc.Add_Click({ Invoke-Safely { Read-DriveCd } })
     # Esc leaves Scan several (asking first if barcodes are waiting).
     $ui.TxtBarcode.Add_PreviewKeyDown({ param($s, $e) if ($e.Key -eq 'Escape' -and $script:Batching) { Invoke-Safely { Switch-Batch }; $e.Handled = $true } })
     $ui.BtnLookup.Add_Click({ Invoke-Safely { Start-LookupAll } })
