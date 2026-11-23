@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 # The version lives here and in CHANGELOG.md; Build.cmd stops if they disagree.
 # Two-digit minor: 1.00, 1.01 ... 1.10. The release folder is "CD Catalogue v<version>".
 $script:AppName     = 'CD Catalogue'
-$script:AppVersion  = '1.06'
+$script:AppVersion  = '1.07'
 $script:Description = 'PowerShell/WPF tool for cataloguing a CD collection'
 $script:Copyright   = 'Copyright (c) 2026 Jason Rhodes'
 $script:RepoUrl     = 'https://github.com/jason4bury/CD-Catalogue'
@@ -891,7 +891,7 @@ $script:InfoScan = {
 # ---------------------------------------------------------------------------
 $script:HelpText = @'
 WHAT IT DOES
-CD Catalogue keeps a searchable list of your CDs: artist, album, year, label, number of tracks and discs, the barcode, the cover, where each CD is kept and your own notes.
+CD Catalogue keeps a searchable list of your CDs: artist, album, year, label, number of tracks and discs, the barcode, the cover, where each CD is kept and your own notes. Add a CD by scanning its barcode, by putting it in the PC's drive and pressing Read CD, or by hand.
 
 ADDING CDS BY BARCODE
 Click in the barcode box at the top and scan the barcode on the back of the CD with a USB or Bluetooth barcode scanner (it types the number and presses Enter for you), or type the number under the bars and press Enter. The details come from MusicBrainz and the cover from the Cover Art Archive (both free, no account). You can scan one CD after another: each is looked up in turn, about one a second. A CD already in the list is pointed out instead of being added twice. A barcode MusicBrainz doesn't know is still added, as "(not found)", so you can fill it in with Edit.
@@ -906,7 +906,7 @@ WHICH VERSION IS YOURS?
 MusicBrainz often has several versions of a CD with the same barcode: other countries, reissues, different labels or box sets. When a barcode has more than one, the CD is added with the most likely one and, once the look-ups have finished, the app asks which is yours: each version shows its cover, date, country, label, catalogue number, format and tracks (See on MusicBrainz opens its page there, with its track list and photos of the sleeve). Pick yours, or Keep the current one. Choose the version, under a CD's details, shows them again at any time.
 
 CDS WITHOUT A BARCODE
-Add by hand adds one by hand. Look up in the edit window (or Look up online for all of them) finds the year, label, tracks and cover by artist and album.
+If the PC has a CD drive, put the CD in and press Read CD first: it's found by its tracks, so it doesn't need a barcode. Otherwise Add by hand adds one by hand. Look up in the edit window (or Look up online for all of them) finds the year, label, tracks and cover by artist and album.
 
 COVERS, LIST AND ARTISTS
 Covers shows your CDs as a wall of covers, List as a list, and Artists by artist; the app remembers which. In List, click a column heading to sort (Covers follows the same order). Click a CD to see its cover and details in the panel at the bottom right: Edit changes it (or double-click the CD), Remove takes it off the list, and MusicBrainz opens its page there.
@@ -918,7 +918,7 @@ WHAT'S MISSING?
 In Artists, pick an artist and press What's missing? to see their studio albums on MusicBrainz (no singles, live albums or compilations), oldest first, with the ones you have marked and See on MusicBrainz for each. It needs at least one of their CDs to have come from MusicBrainz, and takes a second or two for each of their CDs.
 
 THE KEY: MB AND HAND
-Every CD has a mark on its cover (and in List's From column): MB when its details came from MusicBrainz (scanned, or found with Look up), Hand when they were entered by hand (added by hand, or a barcode MusicBrainz didn't know, filled in with Edit). The key at the top right shows how many of each; click one to show only those CDs, and click it again to show them all. You can also search source:mb or source:hand. A hand-entered CD becomes MB once Look up (or Look up online) finds it.
+Every CD has a mark on its cover (and in List's From column): MB when its details came from MusicBrainz (scanned, read from the drive with Read CD, or found with Look up), Hand when they were entered by hand (added by hand, or a barcode MusicBrainz didn't know, filled in with Edit). The key at the top right shows how many of each; click one to show only those CDs, and click it again to show them all. You can also search source:mb or source:hand. A hand-entered CD becomes MB once Look up (or Look up online) finds it.
 
 SEARCHING
 Type in the search box to find CDs; the search runs a moment after you stop typing. It looks through everything: artist, album, label, genre, barcode, notes, where it's kept, track titles, and the year when you type one. The button at its right (All) picks one thing to search instead: Artist, Album, Year, Label, Genre, Barcode, Notes, Kept or Track.

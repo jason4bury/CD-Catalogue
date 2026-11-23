@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.07] - 2026-11-23
+### Changed
+- **Help** mentions Read CD wherever it helps: in What it does, CDs without a barcode (a CD with no barcode can
+  still be read from the drive) and the MB / Hand key.
+
 ## [1.06] - 2026-11-23
 ### Added
 - **Read CD**: looks up the CD in this PC's drive with no barcode needed. The disc's table of contents gives its
