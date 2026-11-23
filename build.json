@@ -1,0 +1,21 @@
+{
+  "AppName": "CD Catalogue",
+  "EntryScript": "src\\CD-Catalogue.ps1",
+  "Icon": "assets\\CD-Catalogue.ico",
+  "Side": "Home",
+  "Description": "PowerShell/WPF tool for cataloguing a CD collection",
+  "RequireAdmin": false,
+  "Release": {
+    "Files": {
+      "CD-Catalogue.ps1": "src\\CD-Catalogue.ps1",
+      "New-CDCatalogueShortcut.ps1": "src\\New-CDCatalogueShortcut.ps1",
+      "CD Catalogue.cmd": "release\\CD Catalogue.cmd",
+      "assets\\CD-Catalogue.ico": "assets\\CD-Catalogue.ico",
+      "assets\\CD-Catalogue.png": "assets\\CD-Catalogue.png",
+      "README.md": "README.md",
+      "CHANGELOG.md": "CHANGELOG.md",
+      "LICENSE": "LICENSE"
+    },
+    "Shortcut": "New-CDCatalogueShortcut.ps1"
+  }
+}
