@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 # The version lives here and in CHANGELOG.md; Build.cmd stops if they disagree.
 # Two-digit minor: 1.00, 1.01 ... 1.10. The release folder is "CD Catalogue v<version>".
 $script:AppName     = 'CD Catalogue'
-$script:AppVersion  = '1.04'
+$script:AppVersion  = '1.05'
 $script:Description = 'PowerShell/WPF tool for cataloguing a CD collection'
 $script:Copyright   = 'Copyright (c) 2026 Jason Rhodes'
 $script:RepoUrl     = 'https://github.com/jason4bury/CD-Catalogue'
@@ -909,17 +909,17 @@ Every CD has a mark on its cover (and in List's From column): MB when its detail
 
 SEARCHING
 Type in the search box to find CDs; the search runs a moment after you stop typing. It looks through everything: artist, album, label, genre, barcode, notes, where it's kept, track titles, and the year when you type one. The button at its right (All) picks one thing to search instead: Artist, Album, Year, Label, Genre, Barcode, Notes, Kept or Track.
-You can also type what to search in the box, and mix them: artist:harbours  year:1997  label:attic  genre:folk  barcode:5000  notes:signed  kept:loft  track:"harbour lights"  source:hand. Put words with spaces in quotes, such as label:"little wheel". Everything you type has to match, so artist:harbours year:1990-1999 finds that artist's CDs from the 1990s.
+You can also type what to search in the box, and mix them: artist:harbours  year:1997  label:attic  genre:folk  barcode:5000  notes:signed  kept:lounge  track:"harbour lights"  source:hand. Put words with spaces in quotes, such as label:"little wheel". Everything you type has to match, so artist:harbours year:1990-1999 finds that artist's CDs from the 1990s.
 A year can be one year (1997), a range (1990-1999, or 1990 to 1999) or a decade (1990s). The status line says how many CDs match.
 
 SEARCHING FOR A SONG
 To find which CD has a song, pick Track on the search button (or type track: and the title). Track lists come from MusicBrainz in the background, about one CD a second, for the CDs found there, so a newly added CD can be searched by song a little later. CDs entered by hand have no track list.
 
 WHERE IT'S KEPT
-Kept, in the edit window, is where the CD lives: pick one of your places (or Not set). Places... changes the list, such as In Front Room; In Loft. It shows in the CD's details and in List's Kept column, the search finds it (or type kept:loft), and it's in the CSV, the report and Stats.
+Kept, in the edit window, is where the CD lives: pick one of your places (or Not set). Places... changes the list, such as Lounge; Spare room; Car. It shows in the CD's details and in List's Kept column, the search finds it (or type kept:lounge), and it's in the CSV, the report and Stats.
 
 PICK FOR ME
-Can't decide what to play? Pick for me (in the side bar) picks a CD at random and shows it. It picks from the CDs shown, so search first to pick from one place (kept:loft), genre or decade. Press it again for another.
+Can't decide what to play? Pick for me (in the side bar) picks a CD at random and shows it. It picks from the CDs shown, so search first to pick from one place (kept:lounge), genre or decade. Press it again for another.
 
 THE DISC
 The disc beside the cover shows the CD's own label when the Cover Art Archive has a photo of it (people add these to MusicBrainz, so popular CDs often have one and others don't). They're found in the background, a CD at a time, for each CD from MusicBrainz; when its own version has none, the other versions with the same barcode are tried, as they usually share the disc print. A CD with no photo is looked at again a week later, in case someone has added one. With no photo, it shows a blank CD.
@@ -1380,10 +1380,10 @@ STYLES
         }
         $ed = New-Object Windows.Controls.Button
         $ed.Content = 'Places...'; $ed.Padding = '12,6'; $ed.Margin = '0,0,0,4'; $ed.Background = [Windows.Media.Brushes]::Transparent
-        $ed.ToolTip = 'Change the list of places, such as In Front Room; In Loft'
+        $ed.ToolTip = 'Change the list of places, such as Lounge; Spare room; Car'
         $ed.Add_Click({
             $now = (@(Get-Places) -join '; ')
-            $new = Show-AppMessage "Where you keep your CDs, separated by semicolons (;). For example: In Front Room; In Loft; Car" -Ask -Default $now -YesText 'Save' -NoText 'Cancel' -Owner $w
+            $new = Show-AppMessage "Where you keep your CDs, separated by semicolons (;). For example: Lounge; Spare room; Car" -Ask -Default $now -YesText 'Save' -NoText 'Cancel' -Owner $w
             if ($null -ne $new) { $script:Settings.Places = (@($new -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -Unique) -join '; '); Save-AppSetting; & $fillPlaces }
         })
         [void]$chips.Children.Add($ed)

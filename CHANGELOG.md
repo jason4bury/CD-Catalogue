@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.05] - 2026-11-23
+### Changed
+- The examples for Kept places (in Help, the README and the Places... box) are general ones: Lounge, Spare room, Car.
+  Nothing is preset: each person's places are their own, set with Places...
+
 ## [1.04] - 2026-11-23
 ### Changed
 - **Help** brought up to date and put in a clearer order: search lists every field (Kept and Track too), song
