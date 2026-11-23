@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.03] - 2026-11-23
+### Added
+- **Backup and restore** (Backup in the side bar): the whole catalogue (CDs, notes, covers, disc photos and what
+  More about found) in one .zip, and back again on this PC or another. A restore first saves the catalogue as it
+  was in the Backups folder, so it can be undone. Settings and the MusicBrainz sign-in aren't included.
+- **Stats**: CDs, artists, discs, tracks and years, and bars for each decade, the artists you have most of, top
+  labels, top genres and where they're kept.
+- **Kept**: where a CD lives, picked from your own list of places (Places... in the edit window changes it), in the edit window, the details, List, the search (`kept:`),
+  the CSV, the HTML report and Stats.
+- **Exports by artist or place**: Export CSV and HTML report each ask whether to save as listed, by artist (each
+  artist's CDs together, oldest first) or by place (each place's CDs, a list to print and keep with them). The
+  report has a heading for each artist or place.
+- **Pick for me**: a CD at random from the ones shown (search first to pick from one place, genre or decade).
+- **Search by song**: track lists come from MusicBrainz in the background (about one CD a second); pick Track on
+  the search button or type `track:` to find which CD has a song. Everything searches them too.
+- **What's missing?** in Artists: the artist's studio albums on MusicBrainz, oldest first, with the ones you have
+  marked.
+- Backups include the track lists.
+
 ## [1.02] - 2026-11-23
 ### Changed
 - **Artists** opens on **All artists** at the top of the list: every CD, in artist order ("The" skipped) and then

@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 # The version lives here and in CHANGELOG.md; Build.cmd stops if they disagree.
 # Two-digit minor: 1.00, 1.01 ... 1.10. The release folder is "CD Catalogue v<version>".
 $script:AppName     = 'CD Catalogue'
-$script:AppVersion  = '1.02'
+$script:AppVersion  = '1.03'
 $script:Description = 'PowerShell/WPF tool for cataloguing a CD collection'
 $script:Copyright   = 'Copyright (c) 2026 Jason Rhodes'
 $script:RepoUrl     = 'https://github.com/jason4bury/CD-Catalogue'
@@ -347,6 +347,27 @@ STYLES
 </Window>
 '@.Replace('STYLES', $script:Styles)
 
+function Show-AppChoice([string]$Text, [string]$First, [string]$Second, [string]$Title = $script:AppName, [string]$Third) {
+    <# Two (or three) choices: 1 for the first button, 2 for the second, 3 for the third, $null when the window is closed. #>
+    $w = New-XamlWindow $script:MessageXaml $script:Window
+    $w.Title = $Title
+    $w.FindName('MsgText').Text = $Text
+    $one = $w.FindName('MsgYes'); $two = $w.FindName('MsgNo')
+    $one.Content = $First; $two.Content = $Second; $two.IsCancel = $false
+    $script:ChoiceAnswer = $null
+    $one.Add_Click({ $script:ChoiceAnswer = 1; $w.Close() })
+    $two.Add_Click({ $script:ChoiceAnswer = 2; $w.Close() })
+    if ($Third) {
+        $two.Margin = '0,0,8,0'
+        $three = New-Object Windows.Controls.Button
+        $three.Content = $Third; $three.MinWidth = 80; $three.Margin = '0'
+        $three.Add_Click({ $script:ChoiceAnswer = 3; $w.Close() })
+        [void]$one.Parent.Children.Add($three)
+    }
+    [void]$w.ShowDialog()
+    return $script:ChoiceAnswer
+}
+
 function Show-AppMessage {
     <# A message, a question (with -NoText: $true for the first button) or, with -Ask,
        a question with a text box (returns the text, or $null when cancelled). #>
@@ -460,6 +481,8 @@ public class CdItem {
     public int Discs { get; set; }
     public string Cover { get; set; }      // picture file saved in the app's Covers folder (or one you chose)
     public string Notes { get; set; }
+    public string Shelf { get; set; }      // where the CD is kept: a shelf, box or room
+    public string TrackText { get; set; }  // its track titles, one a line (kept in Tracks\, not in catalogue.json)
     public string Disc { get; set; }       // a photo of the disc itself (its label), or '-' when the Cover Art Archive has none
     public string DiscOf { get; set; }     // the MusicBrainz release that Disc was looked for (so a new version is looked again)
     public string DiscWhen { get; set; }   // when it was looked for: a CD with no photo is looked again a week later
@@ -619,7 +642,7 @@ public class CdWallPanel : VirtualizingPanel, IScrollInfo {
 $script:CatalogPath = Join-Path $script:DataDir 'catalogue.json'
 $script:CoverDir = Join-Path $script:DataDir 'Covers'
 $script:Items = New-Object Collections.ObjectModel.ObservableCollection[CdItem]
-$script:Fields = 'Id', 'Barcode', 'Artist', 'Album', 'Year', 'Genre', 'Label', 'Country', 'Cover', 'Notes', 'Added', 'Mbid', 'Disc', 'DiscOf', 'DiscWhen'
+$script:Fields = 'Id', 'Barcode', 'Artist', 'Album', 'Year', 'Genre', 'Label', 'Country', 'Cover', 'Notes', 'Added', 'Mbid', 'Disc', 'DiscOf', 'DiscWhen', 'Shelf'
 
 function Save-Catalogue {
     try {
@@ -627,6 +650,7 @@ function Save-Catalogue {
     } catch { Write-AppLog "catalogue.json couldn't be saved: $($_.Exception.Message)" }
 }
 
+$script:TrackDir = Join-Path $script:DataDir 'Tracks'   # each CD's track titles, for searching by song
 function Read-Catalogue {
     if (-not (Test-Path -LiteralPath $script:CatalogPath)) { return }
     try {
@@ -635,6 +659,11 @@ function Read-Catalogue {
             $i = New-Object CdItem
             foreach ($p in $script:Fields) { $i.$p = [string]$r.$p }
             $i.Tracks = [int]$r.Tracks; $i.Discs = [int]$r.Discs
+            foreach ($p in 'Cover', 'Disc') { if ($i.$p -and $i.$p -ne '-' -and -not [IO.Path]::IsPathRooted($i.$p)) { $i.$p = Join-Path $script:DataDir $i.$p } }
+            if ($i.Mbid -and $i.Mbid -ne '-') {
+                $tf = Join-Path $script:TrackDir "$($i.Mbid).txt"
+                if (Test-Path -LiteralPath $tf) { $i.TrackText = [IO.File]::ReadAllText($tf) }
+            }
             $script:Items.Add($i)
         }
     } catch { Write-AppLog "catalogue.json couldn't be read: $($_.Exception.Message)" }
@@ -867,7 +896,7 @@ CDS WITHOUT A BARCODE
 Add by hand adds one by hand. Look up in the edit box (or Look up online for all of them) finds the year, label, tracks and cover by artist and album.
 
 THE LIST
-Covers shows your CDs as a wall of covers, List as a list, and Artists by artist; the app remembers which. In List, click a column heading to sort (Covers follows the same order). Click a CD to see its cover and details in the panel at the bottom right; Edit changes it (or double-click the CD), Remove takes it off the list, and MusicBrainz opens its page there. Export CSV saves the list (or just the CDs your search found) as a CSV file for Excel and other spreadsheets. HTML report saves it as a page with the covers, to open in any browser, print or share; hover over a cover there to see it bigger, or over an album for its details (with the tracks, once More about the CD and artist has been opened for it).
+Covers shows your CDs as a wall of covers, List as a list, and Artists by artist; the app remembers which. In List, click a column heading to sort (Covers follows the same order). Click a CD to see its cover and details in the panel at the bottom right; Edit changes it (or double-click the CD), Remove takes it off the list, and MusicBrainz opens its page there. Export CSV saves the list (or just the CDs your search found) as a CSV file for Excel and other spreadsheets, as listed, by artist or by place. HTML report saves it as a page with the covers, to open in any browser, print or share: as listed, by artist (a heading for each artist, their CDs oldest first) or by place (a heading for each place where CDs are kept: print it and keep it with them); hover over a cover there to see it bigger, or over an album for its details (with the tracks, once More about the CD and artist has been opened for it).
 
 
 THE KEY: MB AND HAND
@@ -877,9 +906,25 @@ Artists lists every artist on the left, with how many CDs you have and the years
 
 SEARCHING
 Type in the search box to find CDs; the search runs a moment after you stop typing. It looks through everything: artist, album, label, genre, barcode, notes, and the year when you type one. The button at its right (All) picks one thing to search instead: Artist, Album, Year, Label, Genre, Barcode or Notes.
-You can also type what to search in the box, and mix them: artist:harbours  year:1997  label:attic  genre:folk  barcode:5000  notes:signed  source:hand. Put a name with spaces in quotes, such as label:"little wheel". Everything you type has to match, so artist:harbours year:1990-1999 finds that artist's CDs from the 1990s.
+You can also type what to search in the box, and mix them: artist:harbours  year:1997  label:attic  genre:folk  barcode:5000  notes:signed  kept:loft  source:hand. Put a name with spaces in quotes, such as label:"little wheel". Everything you type has to match, so artist:harbours year:1990-1999 finds that artist's CDs from the 1990s.
 A year can be one year (1997), a range (1990-1999, or 1990 to 1999) or a decade (1990s). The status line says how many CDs match.
+To find which CD has a song, pick Track on the button (or type track:harbour lights). Track lists come from MusicBrainz in the background, about one CD a second, for the CDs found there; Everything searches them too.
 
+
+WHERE IT'S KEPT
+Kept, in the edit window, is where the CD lives: pick one of your places (or Not set). Places... changes the list, such as In Front Room; In Loft. It shows in the CD's details and in List, the search finds it (or type kept:loft), and it's in the CSV, the report and Stats.
+
+
+PICK FOR ME
+Can't decide what to play? Pick for me (in the side bar) picks a CD at random and shows it. It picks from the CDs shown, so search first to pick from one place (kept:loft), genre or decade. Press it again for another.
+
+WHAT'S MISSING?
+In Artists, pick an artist and press What's missing? to see their studio albums on MusicBrainz (no singles, live albums or compilations), oldest first, with the ones you have marked and See on MusicBrainz for each. It needs at least one of their CDs to have come from MusicBrainz, and takes a second or two for each of their CDs.
+STATS
+Stats shows your collection in numbers: how many CDs, artists, discs and tracks, the years they span, how many came from MusicBrainz, and bars for each decade, the artists you have most of, the top labels and genres, and where they're kept.
+
+BACKUP AND RESTORE
+Backup saves your whole catalogue (the CDs, your notes, covers, disc photos and what More about found) in one .zip file: keep it on another drive or in the cloud. Restore puts a backup back on this PC or another one, replacing the CDs there; the catalogue as it was is saved first in the Backups folder in the data folder, so a restore can be undone. Settings and the MusicBrainz sign-in aren't in a backup.
 CSV FILES AND EXCEL
 The CSV opens correctly in Excel with a double-click: barcodes keep every digit, and titles such as 007 or 3/4 stay as typed. To do that such values are written as ="007" in the file, which is what you'll see in a plain text editor, or in a program other than a spreadsheet that reads the CSV.
 
@@ -1289,7 +1334,7 @@ STYLES
     </Border>
     <Grid>
       <Grid.ColumnDefinitions><ColumnDefinition Width="78"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-      <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+      <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
       <TextBlock Text="Barcode" VerticalAlignment="Center"/><TextBox x:Name="EBarcode" Grid.Column="1" Margin="0,3" Width="160" HorizontalAlignment="Left"/>
       <TextBlock Grid.Row="1" Text="Artist" VerticalAlignment="Center"/><TextBox x:Name="EArtist" Grid.Row="1" Grid.Column="1" Margin="0,3"/>
       <TextBlock Grid.Row="2" Text="Album" VerticalAlignment="Center"/><TextBox x:Name="EAlbum" Grid.Row="2" Grid.Column="1" Margin="0,3"/>
@@ -1297,21 +1342,47 @@ STYLES
       <TextBlock Grid.Row="4" Text="Label" VerticalAlignment="Center"/><TextBox x:Name="ELabel" Grid.Row="4" Grid.Column="1" Margin="0,3"/>
       <TextBlock Grid.Row="5" Text="Genre" VerticalAlignment="Center"/><TextBox x:Name="EGenre" Grid.Row="5" Grid.Column="1" Margin="0,3"/>
       <TextBlock Grid.Row="6" Text="Tracks" VerticalAlignment="Center"/><TextBox x:Name="ETracks" Grid.Row="6" Grid.Column="1" Margin="0,3" Width="80" HorizontalAlignment="Left"/>
-      <TextBlock Grid.Row="7" Text="Cover" VerticalAlignment="Center"/>
-      <DockPanel Grid.Row="7" Grid.Column="1" Margin="0,3"><Button x:Name="ECoverPick" Content="Choose" DockPanel.Dock="Right" Margin="6,0,0,0" Padding="12,7"/><TextBox x:Name="ECover"/></DockPanel>
-      <TextBlock Grid.Row="8" Text="Notes" VerticalAlignment="Top" Margin="0,8,0,0"/><TextBox x:Name="ENotes" Grid.Row="8" Grid.Column="1" Margin="0,3" Height="64" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top"/>
+      <TextBlock Grid.Row="7" Text="Kept" VerticalAlignment="Center"/>
+      <TextBox x:Name="EShelf" Grid.Row="7" Grid.Column="1" Visibility="Collapsed"/>
+      <WrapPanel x:Name="EShelfChips" Grid.Row="7" Grid.Column="1" Margin="0,3" ToolTip="Where the CD is kept. Places... changes the list."/>
+      <TextBlock Grid.Row="8" Text="Cover" VerticalAlignment="Center"/>
+      <DockPanel Grid.Row="8" Grid.Column="1" Margin="0,3"><Button x:Name="ECoverPick" Content="Choose" DockPanel.Dock="Right" Margin="6,0,0,0" Padding="12,7"/><TextBox x:Name="ECover"/></DockPanel>
+      <TextBlock Grid.Row="9" Text="Notes" VerticalAlignment="Top" Margin="0,8,0,0"/><TextBox x:Name="ENotes" Grid.Row="9" Grid.Column="1" Margin="0,3" Height="64" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top"/>
     </Grid>
   </DockPanel>
 </Window>
 '@.Replace('STYLES', $script:Styles)
     $w = New-XamlWindow $x $script:Window
     $w.Title = if ($Item) { 'Edit CD' } else { 'Add CD' }
-    $f = @{}; foreach ($n in 'EBarcode', 'EArtist', 'EAlbum', 'EYear', 'ELabel', 'EGenre', 'ETracks', 'ECover', 'ENotes', 'ENote', 'ECoverImg') { $f[$n] = $w.FindName($n) }
+    $f = @{}; foreach ($n in 'EBarcode', 'EArtist', 'EAlbum', 'EYear', 'ELabel', 'EGenre', 'ETracks', 'EShelf', 'EShelfChips', 'ECover', 'ENotes', 'ENote', 'ECoverImg') { $f[$n] = $w.FindName($n) }
     if ($Item) {
         $f.EBarcode.Text = $Item.Barcode; $f.EArtist.Text = $Item.Artist; $f.EAlbum.Text = $Item.Album; $f.EYear.Text = $Item.Year; $f.ELabel.Text = $Item.Label
-        $f.EGenre.Text = $Item.Genre; $f.ETracks.Text = if ($Item.Tracks) { [string]$Item.Tracks } else { '' }; $f.ECover.Text = $Item.Cover; $f.ENotes.Text = $Item.Notes
+        $f.EGenre.Text = $Item.Genre; $f.ETracks.Text = if ($Item.Tracks) { [string]$Item.Tracks } else { '' }; $f.ECover.Text = $Item.Cover; $f.ENotes.Text = $Item.Notes; $f.EShelf.Text = $Item.Shelf
     }
     $state = @{ Mbid = $(if ($Item) { $Item.Mbid } else { '' }); Country = $(if ($Item) { $Item.Country } else { '' }); Discs = $(if ($Item) { $Item.Discs } else { 0 }) }
+    # Kept: one of your places (or none), as buttons; Places... changes the list.
+    $fillPlaces = {
+        $chips = $f.EShelfChips; $chips.Children.Clear()
+        $places = @(Get-Places)
+        if ($f.EShelf.Text -and $places -notcontains $f.EShelf.Text) { $places += $f.EShelf.Text }   # a place no longer on the list
+        foreach ($p in @('') + $places) {
+            $bt = New-Object Windows.Controls.Button
+            $bt.Content = if ($p) { $p } else { 'Not set' }; $bt.Tag = $p; $bt.Padding = '12,6'; $bt.Margin = '0,0,6,4'
+            if ($p -eq $f.EShelf.Text) { $bt.Style = $w.FindResource('Accent') }
+            $bt.Add_Click({ $f.EShelf.Text = [string]$this.Tag; & $fillPlaces })
+            [void]$chips.Children.Add($bt)
+        }
+        $ed = New-Object Windows.Controls.Button
+        $ed.Content = 'Places...'; $ed.Padding = '12,6'; $ed.Margin = '0,0,0,4'; $ed.Background = [Windows.Media.Brushes]::Transparent
+        $ed.ToolTip = 'Change the list of places, such as In Front Room; In Loft'
+        $ed.Add_Click({
+            $now = (@(Get-Places) -join '; ')
+            $new = Show-AppMessage "Where you keep your CDs, separated by semicolons (;). For example: In Front Room; In Loft; Car" -Ask -Default $now -YesText 'Save' -NoText 'Cancel' -Owner $w
+            if ($null -ne $new) { $script:Settings.Places = (@($new -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -Unique) -join '; '); Save-AppSetting; & $fillPlaces }
+        })
+        [void]$chips.Children.Add($ed)
+    }
+    & $fillPlaces
     $showCover = { $f.ECoverImg.Source = Get-Picture $f.ECover.Text 300 }
     & $showCover
     $f.ECover.Add_TextChanged({ & $showCover })
@@ -1349,7 +1420,7 @@ STYLES
     $Item.Barcode = ($f.EBarcode.Text -replace '\D', ''); $Item.Artist = $f.EArtist.Text.Trim(); $Item.Album = $f.EAlbum.Text.Trim(); $Item.Year = $f.EYear.Text.Trim()
     $Item.Label = $f.ELabel.Text.Trim(); $Item.Genre = $f.EGenre.Text.Trim()
     $t = 0; [void][int]::TryParse($f.ETracks.Text.Trim(), [ref]$t); $Item.Tracks = $t
-    $Item.Cover = $f.ECover.Text.Trim(); $Item.Notes = $f.ENotes.Text.Trim(); $Item.Mbid = $state.Mbid; $Item.Country = $state.Country; $Item.Discs = [int]$state.Discs
+    $Item.Cover = $f.ECover.Text.Trim(); $Item.Notes = $f.ENotes.Text.Trim(); $Item.Shelf = $f.EShelf.Text.Trim(); $Item.Mbid = $state.Mbid; $Item.Country = $state.Country; $Item.Discs = [int]$state.Discs
     if ($new) { $script:Items.Add($Item) }
     Save-Catalogue
     [Windows.Data.CollectionViewSource]::GetDefaultView($script:Items).Refresh()
@@ -1824,6 +1895,9 @@ STYLES
           <Button x:Name="BtnLookup" Style="{StaticResource Rail}" Content="Look up online" Tag="M13,6.5 A6.5,6.5 0 1 1 0,6.5 A6.5,6.5 0 1 1 13,6.5 M11,11 L16,16" ToolTip="Fill in missing details and covers for CDs added by hand"/>
           <Button x:Name="BtnCsv" Style="{StaticResource Rail}" Content="Export CSV" Tag="M0,0 H16 V16 H0 Z M0,5.5 H16 M0,10.5 H16 M6,0 V16" ToolTip="Save your CDs (or what your search found) as a CSV file for Excel and other spreadsheets"/>
           <Button x:Name="BtnReport" Style="{StaticResource Rail}" Content="HTML report" Tag="M8,11 V0 M4,4 L8,0 L12,4 M0,9 V16 H16 V9" ToolTip="Save your CDs (or what your search found) as a web page with the covers, to open, print or share"/>
+          <Button x:Name="BtnPick" Style="{StaticResource Rail}" Content="Pick for me" Tag="M1,1 H15 V15 H1 Z M5,5 V5.1 M11,5 V5.1 M8,8 V8.1 M5,11 V11.1 M11,11 V11.1" ToolTip="Can't decide what to play? Picks a CD at random from the ones shown (search first to pick from one place, genre or decade)"/>
+          <Button x:Name="BtnStats" Style="{StaticResource Rail}" Content="Stats" Tag="M0,16 H16 M2,16 V9 M6,16 V3 M10,16 V7 M14,16 V11" ToolTip="Your collection in numbers: decades, top artists, labels and genres"/>
+          <Button x:Name="BtnBackup" Style="{StaticResource Rail}" Content="Backup" Tag="M2,0 H11 L14,3 V16 H2 Z M5,0 V5 H10 V0 M5,10 H11 M5,13 H11" ToolTip="Back up your whole catalogue to one file, or restore a backup"/>
           <Button x:Name="BtnCollection" Style="{StaticResource Rail}" Content="MB collection" Tag="M2,0 H14 V16 L8,11 L2,16 Z" ToolTip="Send your CDs to a collection in your MusicBrainz account"/>
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom">
@@ -1930,6 +2004,7 @@ STYLES
               <DataGridTextColumn Header="Artist" Width="1.5*" MinWidth="70" Binding="{Binding Artist}" ElementStyle="{StaticResource Cell}"/>
               <DataGridTextColumn Header="Year" Width="58" Binding="{Binding Year}"/>
               <DataGridTextColumn Header="Label" Width="1.1*" MinWidth="50" Binding="{Binding Label}" ElementStyle="{StaticResource Cell}"/>
+              <DataGridTextColumn Header="Kept" Width="0.8*" MinWidth="50" Binding="{Binding Shelf}" ElementStyle="{StaticResource Cell}"/>
               <DataGridTextColumn Header="Tracks" Width="64" Binding="{Binding Tracks}"/>
               <DataGridTextColumn Header="Barcode" Width="118" Binding="{Binding Barcode}"/>
             </DataGrid.Columns>
@@ -1950,10 +2025,14 @@ STYLES
             </DockPanel>
           </Border>
           <DockPanel Grid.Column="1" Margin="14,0,0,0">
-            <StackPanel DockPanel.Dock="Top" Margin="10,0,0,8">
-              <TextBlock x:Name="ArtName" FontSize="24" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-              <TextBlock x:Name="ArtMeta" Foreground="{Soft}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
-            </StackPanel>
+            <DockPanel DockPanel.Dock="Top" Margin="10,0,0,8">
+              <Button x:Name="BtnGaps" DockPanel.Dock="Right" Content="What's missing?" VerticalAlignment="Center" Padding="14,7" Margin="12,0,0,0" Visibility="Collapsed"
+                      ToolTip="This artist's studio albums on MusicBrainz, with the ones you have marked"/>
+              <StackPanel>
+                <TextBlock x:Name="ArtName" FontSize="24" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="ArtMeta" Foreground="{Soft}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+              </StackPanel>
+            </DockPanel>
             <ListBox x:Name="Disco" Background="Transparent" BorderThickness="0" Padding="0" Foreground="{Ink}" IsSynchronizedWithCurrentItem="False"
                  ItemContainerStyle="{StaticResource DiscoTile}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.CanContentScroll="True">
           <ListBox.Template><ControlTemplate TargetType="ListBox">
@@ -2136,6 +2215,7 @@ function Show-Artist($Row) {
     $script:DiscoSet = $null
     if ($Row -and $Row.Key -ne '*' -and $script:ArtistGroups) { $script:DiscoSet = $script:ArtistGroups[$Row.Key] }   # assigned directly: an if would unroll the set
     $everyone = $Row -and $Row.Key -eq '*'
+    $ui.BtnGaps.Visibility = if ($Row -and $Row.Key -and -not $everyone) { 'Visible' } else { 'Collapsed' }
     $sorts = if ($everyone) { @('NoArtist', 'ArtistSort', 'Year', 'Album') } else { @('Year', 'Album') }
     if ((@($script:DiscoView.SortDescriptions | ForEach-Object PropertyName) -join ',') -ne ($sorts -join ',')) {
         $script:DiscoView.SortDescriptions.Clear()
@@ -2171,16 +2251,18 @@ $script:SearchFields = [ordered]@{
     Genre   = @('Genre', 'Search by genre')
     Barcode = @('Barcode', 'Search by barcode')
     Notes   = @('Notes', 'Search your notes')
+    Shelf   = @('Kept', 'Search where CDs are kept')
+    Track   = @('Track', 'Search for a song (track title)')
 }
 $script:SearchField = 'All'
 
 function Get-SearchParts([string]$Text, [string]$Field) {
     <# The search as a list of { Field; Want }: each typed field:value, and the rest for the button's field. #>
     $parts = New-Object Collections.ArrayList
-    $rx = '(?i)\b(artist|album|year|label|genre|country|barcode|notes?|source|from)\s*:\s*("([^"]*)"?|\S*)'
+    $rx = '(?i)\b(artist|album|year|label|genre|country|barcode|notes?|source|from|shelf|kept|box|track|song)\s*:\s*("([^"]*)"?|\S*)'
     foreach ($m in [regex]::Matches($Text, $rx)) {
         $want = if ($m.Groups[3].Success) { $m.Groups[3].Value } else { $m.Groups[2].Value }
-        $name = (Get-Culture).TextInfo.ToTitleCase($m.Groups[1].Value.ToLowerInvariant()) -replace '^Note$', 'Notes' -replace '^From$', 'Source'
+        $name = (Get-Culture).TextInfo.ToTitleCase($m.Groups[1].Value.ToLowerInvariant()) -replace '^Note$', 'Notes' -replace '^From$', 'Source' -replace '^(Kept|Box)$', 'Shelf' -replace '^Song$', 'Track'
         if ($want.Trim()) { [void]$parts.Add(@{ Field = $name; Want = $want.Trim() }) }
     }
     $rest = ([regex]::Replace($Text, $rx, ' ')).Trim()
@@ -2202,7 +2284,8 @@ function Initialize-Search {
     $script:SearchChecks = @(foreach ($c in $script:SearchParts) {
         $span = Get-YearSpan $c.Want
         $names = switch ($c.Field) {
-            'All'  { @('Artist', 'Album', 'Label', 'Genre', 'Barcode', 'Notes') }
+            'All'  { @('Artist', 'Album', 'Label', 'Genre', 'Barcode', 'Notes', 'Shelf', 'TrackText') }
+            'Track' { @('TrackText') }
             'Year' { if ($span) { @() } else { @('Year') } }
             default { @($c.Field) }
         }
@@ -2325,7 +2408,7 @@ function Show-Details {
     $ui.DArtist.Text = $i.Artist
     $ui.DMeta.Text = (@($i.Year, $i.Label, $i.Country, $i.Genre,
         $(if ($i.Tracks) { "$($i.Tracks) track$(if ($i.Tracks -ne 1) { 's' })" }), $(if ($i.Discs -gt 1) { "$($i.Discs) discs" }),
-        $(if ($i.Barcode) { "barcode $($i.Barcode)" }), $(if ($i.FromMb) { 'details from MusicBrainz' } else { 'entered by hand' })) | Where-Object { $_ }) -join '  ·  '
+        $(if ($i.Barcode) { "barcode $($i.Barcode)" }), $(if ($i.FromMb) { 'details from MusicBrainz' } else { 'entered by hand' }), $(if ($i.Shelf) { "kept: $($i.Shelf)" })) | Where-Object { $_ }) -join '  ·  '
     $ui.DNotes.Text = $i.Notes
 }
 
@@ -2475,7 +2558,7 @@ function Step-Disc {
         }
         return
     }
-    if ($script:Worker) { return }   # MusicBrainz look-ups first
+    if ($script:Worker -or $script:GapsOpen) { return }   # MusicBrainz look-ups (and What's missing?) first
     $next = $null
     foreach ($i in $script:Items) {
         if (-not $i.FromMb -or $script:DiscTried.Contains($i.Mbid)) { continue }
@@ -2488,6 +2571,382 @@ function Step-Disc {
     $ps = [PowerShell]::Create()
     [void]$ps.AddScript($script:DiscScan).AddArgument($next.Mbid).AddArgument([string]$next.Barcode).AddArgument($script:CoverDir).AddArgument($script:Agent)
     $script:DiscJob = @{ PS = $ps; Handle = $ps.BeginInvoke(); Item = $next; Mbid = $next.Mbid }
+}
+
+# ---------------------------------------------------------------------------
+#  Backup and restore: the whole catalogue (CDs, covers, disc photos and what
+#  More about found) in one .zip, and back again. Settings (the look and the
+#  MusicBrainz sign-in) aren't included: the sign-in only works on this PC.
+# ---------------------------------------------------------------------------
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+
+function Get-StoredPath([string]$Path) {
+    <# A picture's path as kept in a backup: Covers\name for the app's own, else $null. #>
+    if (-not $Path) { return $null }
+    $full = [IO.Path]::GetFullPath($Path)
+    if ($full.StartsWith($script:DataDir.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { return $full.Substring($script:DataDir.TrimEnd('\').Length + 1) }
+    return $null
+}
+
+function New-CatalogueBackup([string]$ZipPath) {
+    <# Writes the backup and returns how many CDs and pictures it holds. #>
+    Save-Catalogue
+    if (Test-Path -LiteralPath $ZipPath) { Remove-Item -LiteralPath $ZipPath -Force }
+    $zip = [IO.Compression.ZipFile]::Open($ZipPath, 'Create')
+    $pics = 0
+    try {
+        $added = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+        $rows = foreach ($i in $script:Items) {
+            $r = [ordered]@{}; foreach ($p in $script:Fields) { $r[$p] = $i.$p }; $r.Tracks = $i.Tracks; $r.Discs = $i.Discs
+            foreach ($p in 'Cover', 'Disc') {
+                $v = [string]$i.$p
+                if (-not $v -or $v -eq '-' -or -not (Test-Path -LiteralPath $v)) { continue }
+                $rel = Get-StoredPath $v
+                if (-not $rel) { $rel = "Covers\own-$($i.Id)-$p$([IO.Path]::GetExtension($v))" }   # a picture you chose from elsewhere
+                if ($added.Add($rel)) { [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $v, ($rel -replace '\\', '/')); $pics++ }
+                $r[$p] = $rel
+            }
+            [pscustomobject]$r
+        }
+        foreach ($sub in 'Info', 'Tracks') {
+            $dir = Join-Path $script:DataDir $sub
+            if (Test-Path -LiteralPath $dir) {
+                foreach ($f in Get-ChildItem -LiteralPath $dir -File) { [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $f.FullName, "$sub/$($f.Name)") }
+            }
+        }
+        $put = {
+            param($Name, $Text)
+            $en = $zip.CreateEntry($Name); $w = New-Object IO.StreamWriter ($en.Open(), (New-Object Text.UTF8Encoding $false)); $w.Write($Text); $w.Dispose()
+        }
+        & $put 'catalogue.json' (ConvertTo-Json @($rows) -Depth 3)
+        & $put 'backup.json' (ConvertTo-Json ([ordered]@{ App = $script:AppName; Version = $script:AppVersion; Made = (Get-Date).ToString('s'); CDs = $script:Items.Count; Pictures = $pics }))
+    } finally { $zip.Dispose() }
+    return @{ CDs = $script:Items.Count; Pictures = $pics }
+}
+
+function Backup-Catalogue {
+    if (-not $script:Items.Count) { [void](Show-AppMessage 'There are no CDs to back up yet.'); return }
+    $dlg = New-Object Microsoft.Win32.SaveFileDialog
+    $dlg.Filter = 'CD Catalogue backup (*.zip)|*.zip'; $dlg.DefaultExt = '.zip'; $dlg.AddExtension = $true
+    $dlg.FileName = "CD Catalogue backup $((Get-Date).ToString('yyyy-MM-dd')).zip"
+    if (-not $dlg.ShowDialog($script:Window)) { return }
+    $script:Window.Cursor = 'Wait'
+    try { $n = New-CatalogueBackup $dlg.FileName } finally { $script:Window.Cursor = $null }
+    Write-AppLog "Backed up $($n.CDs) CDs and $($n.Pictures) pictures to $($dlg.FileName)"
+    Set-Status "Backed up $($n.CDs) CD$(if ($n.CDs -ne 1) { 's' }) and $($n.Pictures) picture$(if ($n.Pictures -ne 1) { 's' }) to $($dlg.FileName)" 'Good'
+}
+
+function Restore-Catalogue {
+    $dlg = New-Object Microsoft.Win32.OpenFileDialog
+    $dlg.Filter = 'CD Catalogue backup (*.zip)|*.zip'
+    if (-not $dlg.ShowDialog($script:Window)) { return }
+    $zip = $null
+    try {
+        $zip = [IO.Compression.ZipFile]::OpenRead($dlg.FileName)
+        $about = $zip.GetEntry('backup.json'); $cat = $zip.GetEntry('catalogue.json')
+        if (-not $about -or -not $cat) { [void](Show-AppMessage "That isn't a CD Catalogue backup (it has no catalogue in it)."); return }
+        $r = New-Object IO.StreamReader ($about.Open()); $meta = $r.ReadToEnd() | ConvertFrom-Json; $r.Dispose()
+        $made = [datetime]::MinValue; [void][datetime]::TryParse([string]$meta.Made, [ref]$made)
+        $when = if ($made -gt [datetime]::MinValue) { $made.ToString('d MMMM yyyy, HH:mm') } else { 'an unknown date' }
+        $ask = "Replace your $($script:Items.Count) CD$(if ($script:Items.Count -ne 1) { 's' }) with the $($meta.CDs) CD$(if ($meta.CDs -ne 1) { 's' }) in this backup from $($when)?`n`n" +
+               "Your catalogue as it is now is saved first, in the Backups folder beside it, so this can be undone."
+        if (-not (Show-AppMessage $ask -YesText 'Restore' -NoText 'Cancel')) { return }
+        $script:Window.Cursor = 'Wait'
+        # A safety copy of what's there now.
+        $keep = Join-Path $script:DataDir 'Backups'
+        if (-not (Test-Path -LiteralPath $keep)) { New-Item -ItemType Directory -Path $keep -Force | Out-Null }
+        $safety = Join-Path $keep "Before restore $((Get-Date).ToString('yyyy-MM-dd HHmmss')).zip"
+        if ($script:Items.Count) { [void](New-CatalogueBackup $safety) }
+        foreach ($en in $zip.Entries) {
+            if (-not $en.Name -or $en.FullName -eq 'backup.json') { continue }
+            $rel = $en.FullName -replace '/', '\'
+            if ($rel -notmatch '^(catalogue\.json|(Covers|Info|Tracks)\\[^\\]+)$') { continue }   # nothing outside the data folder
+            $to = Join-Path $script:DataDir $rel
+            $dir = Split-Path -Parent $to; if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+            [IO.Compression.ZipFileExtensions]::ExtractToFile($en, $to, $true)
+        }
+        $zip.Dispose(); $zip = $null
+        $script:Items.Clear()
+        Read-Catalogue
+        $script:DiscTried.Clear(); $script:TrackTried.Clear()
+        [Windows.Data.CollectionViewSource]::GetDefaultView($script:Items).Refresh()
+        Update-View; Update-Summary
+        if ($script:Items.Count) { $script:UI.Grid.SelectedItem = @([Windows.Data.CollectionViewSource]::GetDefaultView($script:Items))[0] }
+        Write-AppLog "Restored $($script:Items.Count) CDs from $($dlg.FileName) (the catalogue before it is in $safety)"
+        Set-Status "Restored $($script:Items.Count) CD$(if ($script:Items.Count -ne 1) { 's' }) from the backup. Your catalogue as it was is in the Backups folder." 'Good'
+    } catch {
+        Write-AppLog "Restore: $($_.Exception.Message)"
+        [void](Show-AppMessage "The backup couldn't be restored:`n$($_.Exception.Message)")
+    } finally { if ($zip) { $zip.Dispose() }; $script:Window.Cursor = $null }
+}
+
+function Get-Places {
+    <# Your places for Kept, from settings (Places, separated by semicolons). #>
+    return @(([string]$script:Settings.Places) -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
+function Show-Backup {
+    $c = Show-AppChoice ("Back up saves your whole catalogue (CDs, notes, covers and disc photos) in one .zip file. Keep it somewhere safe, such as another drive or the cloud.`n`n" +
+        "Restore puts a backup back, replacing the CDs here.") 'Back up' 'Restore' 'Backup and restore'
+    if ($c -eq 1) { Backup-Catalogue } elseif ($c -eq 2) { Restore-Catalogue }
+}
+
+# ---------------------------------------------------------------------------
+#  Stats: the collection in numbers
+# ---------------------------------------------------------------------------
+function Show-Stats {
+    $all = @($script:Items)
+    if (-not $all.Count) { [void](Show-AppMessage 'There are no CDs yet, so there are no stats.'); return }
+    $x = @'
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="780" Height="640" MinWidth="560" MinHeight="400" ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
+        FontFamily="Bahnschrift, Segoe UI" FontSize="13.5" Background="{Page}" Foreground="{Ink}">
+  <Window.Resources>
+STYLES
+  </Window.Resources>
+  <DockPanel Margin="20,6,20,18">
+    <Button x:Name="SClose" DockPanel.Dock="Bottom" Content="Close" HorizontalAlignment="Right" MinWidth="80" Margin="0,14,0,0" IsCancel="True" IsDefault="True"/>
+    <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="SBody"/></ScrollViewer>
+  </DockPanel>
+</Window>
+'@.Replace('STYLES', $script:Styles)
+    $w = New-XamlWindow $x $script:Window
+    $w.Title = 'Your collection in numbers'
+    $body = $w.FindName('SBody')
+    $card = {
+        param([string]$Title)
+        $bd = New-Object Windows.Controls.Border
+        $bd.Background = Get-Brush 'Card'; $bd.CornerRadius = 18; $bd.Padding = '18,14'; $bd.Margin = '0,0,0,12'
+        $sp = New-Object Windows.Controls.StackPanel; $bd.Child = $sp
+        $t = New-Object Windows.Controls.TextBlock; $t.Text = $Title.ToUpper(); $t.Foreground = Get-Brush 'Accent'; $t.FontWeight = 'SemiBold'; $t.Margin = '0,0,0,8'
+        [void]$sp.Children.Add($t); [void]$body.Children.Add($bd)
+        return $sp
+    }
+    $bars = {
+        param($Panel, $Pairs)   # @(@(label, count), ...)
+        $max = [Math]::Max(1, (@($Pairs | ForEach-Object { $_[1] }) | Measure-Object -Maximum).Maximum)
+        foreach ($p in $Pairs) {
+            $g = New-Object Windows.Controls.Grid; $g.Margin = '0,2'
+            foreach ($cw in '170', '*', '44') { $cd = New-Object Windows.Controls.ColumnDefinition; $cd.Width = (New-Object Windows.GridLengthConverter).ConvertFromString($cw); $g.ColumnDefinitions.Add($cd) }
+            $l = New-Object Windows.Controls.TextBlock; $l.Text = $p[0]; $l.TextTrimming = 'CharacterEllipsis'; $l.VerticalAlignment = 'Center'; $l.ToolTip = $p[0]
+            $bar = New-Object Windows.Controls.Border; $bar.Height = 14; $bar.CornerRadius = 7; $bar.Background = Get-Brush 'Accent'; $bar.HorizontalAlignment = 'Left'
+            $bar.Width = [Math]::Max(6, 360.0 * $p[1] / $max); $bar.Margin = '8,0'
+            $n = New-Object Windows.Controls.TextBlock; $n.Text = [string]$p[1]; $n.Foreground = Get-Brush 'Soft'; $n.HorizontalAlignment = 'Right'; $n.VerticalAlignment = 'Center'
+            [Windows.Controls.Grid]::SetColumn($bar, 1); [Windows.Controls.Grid]::SetColumn($n, 2)
+            foreach ($c in $l, $bar, $n) { [void]$g.Children.Add($c) }
+            [void]$Panel.Children.Add($g)
+        }
+    }
+    $top = {
+        param($Values, [int]$Count = 10)
+        @($Values | Where-Object { $_ } | Group-Object | Sort-Object @{ Expression = 'Count'; Descending = $true }, Name | Select-Object -First $Count | ForEach-Object { , @($_.Name, $_.Count) })
+    }
+    # The numbers
+    $artists = @($all | Where-Object { ([string]$_.Artist).Trim() } | ForEach-Object { ([string]$_.Artist).Trim().ToLowerInvariant() } | Select-Object -Unique).Count
+    $tracks = ($all | Measure-Object Tracks -Sum).Sum
+    $discs = (@($all | ForEach-Object { [Math]::Max(1, [int]$_.Discs) }) | Measure-Object -Sum).Sum
+    $mb = @($all | Where-Object { $_.FromMb }).Count
+    $years = @($all | Where-Object { $_.Year -match '^\d{4}$' } | ForEach-Object { [int]$_.Year } | Sort-Object)
+    $sp = & $card 'Your collection'
+    $facts = [ordered]@{
+        'CDs' = $all.Count; 'Artists' = $artists; 'Discs' = $discs; 'Tracks' = $tracks
+        'Years' = $(if ($years.Count) { "$($years[0]) to $($years[-1])" } else { '' })
+        'With a cover' = @($all | Where-Object { $_.Shown }).Count
+        'Details from MusicBrainz' = $mb; 'Entered by hand' = $all.Count - $mb
+        'With a place kept' = @($all | Where-Object { $_.Shelf }).Count
+    }
+    foreach ($k in $facts.Keys) {
+        if ("$($facts[$k])" -eq '') { continue }
+        $g = New-Object Windows.Controls.Grid; $g.Margin = '0,2'
+        foreach ($cw in '200', '*') { $cd = New-Object Windows.Controls.ColumnDefinition; $cd.Width = (New-Object Windows.GridLengthConverter).ConvertFromString($cw); $g.ColumnDefinitions.Add($cd) }
+        $l = New-Object Windows.Controls.TextBlock; $l.Text = $k; $l.Foreground = Get-Brush 'Soft'
+        $v = New-Object Windows.Controls.TextBlock; $v.Text = [string]$facts[$k]; $v.FontWeight = 'SemiBold'
+        [Windows.Controls.Grid]::SetColumn($v, 1); [void]$g.Children.Add($l); [void]$g.Children.Add($v); [void]$sp.Children.Add($g)
+    }
+    # Decades
+    if ($years.Count) {
+        $sp = & $card 'By decade'
+        & $bars $sp @($years | ForEach-Object { [int]([Math]::Floor($_ / 10) * 10) } | Group-Object | Sort-Object { [int]$_.Name } | ForEach-Object { , @("$($_.Name)s", $_.Count) })
+    }
+    $names = @{}; foreach ($i in $all) { $k = ([string]$i.Artist).Trim(); if ($k -and -not $names.ContainsKey($k.ToLowerInvariant())) { $names[$k.ToLowerInvariant()] = $k } }
+    $a = & $top @($all | ForEach-Object { ([string]$_.Artist).Trim().ToLowerInvariant() } | Where-Object { $_ })
+    if ($a.Count) { $sp = & $card 'Artists you have most of'; & $bars $sp @($a | ForEach-Object { , @($names[$_[0]], $_[1]) }) }
+    $l = & $top @($all | ForEach-Object { ([string]$_.Label).Trim() })
+    if ($l.Count) { $sp = & $card 'Top labels'; & $bars $sp $l }
+    $gs = & $top @($all | ForEach-Object { ([string]$_.Genre) -split '\s*,\s*' } | ForEach-Object { (Get-Culture).TextInfo.ToTitleCase($_.Trim().ToLowerInvariant()) })
+    if ($gs.Count) { $sp = & $card 'Top genres'; & $bars $sp $gs }
+    $sh = & $top @($all | ForEach-Object { ([string]$_.Shelf).Trim() }) 20
+    if ($sh.Count) { $sp = & $card 'Where they are kept'; & $bars $sp $sh }
+    $w.FindName('SClose').Add_Click({ $w.Close() })
+    [void]$w.ShowDialog()
+}
+
+# ---------------------------------------------------------------------------
+#  Track lists, for searching by song: fetched from MusicBrainz in the
+#  background, one CD a second, after the disc photos, and kept in Tracks\.
+# ---------------------------------------------------------------------------
+$script:TrackScan = {
+    param([string]$Mbid, [string]$Agent)
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    for ($try = 0; $try -lt 2; $try++) {
+        Start-Sleep -Milliseconds (1100 + 2000 * $try)   # MusicBrainz asks for one request a second
+        try {
+            $r = Invoke-RestMethod -Uri "https://musicbrainz.org/ws/2/release/$($Mbid)?inc=recordings&fmt=json" -UserAgent $Agent -TimeoutSec 20
+            return ((@($r.media) | ForEach-Object { @($_.tracks) | ForEach-Object { [string]$_.title } }) -join "`n") + "`n"
+        } catch {
+            $code = 0; try { $code = [int]$_.Exception.Response.StatusCode } catch { $code = 0 }
+            if ($code -eq 404 -or $code -eq 400) { return "`n" }   # gone from MusicBrainz: nothing to search
+        }
+    }
+    return $null
+}
+$script:TrackJob = $null
+$script:GapsOpen = $false
+$script:TrackTried = New-Object 'Collections.Generic.HashSet[string]'
+
+function Step-Tracks {
+    $job = $script:TrackJob
+    if ($job) {
+        if (-not $job.Handle.IsCompleted) { return }
+        $out = $null
+        try { $out = @($job.PS.EndInvoke($job.Handle)) | Select-Object -Last 1 } catch { Write-AppLog "Track list: $($_.Exception.Message)" }
+        $job.PS.Dispose(); $script:TrackJob = $null
+        if ($null -ne $out -and $job.Item.Mbid -eq $job.Mbid) {
+            if (-not (Test-Path -LiteralPath $script:TrackDir)) { New-Item -ItemType Directory -Path $script:TrackDir -Force | Out-Null }
+            [IO.File]::WriteAllText((Join-Path $script:TrackDir "$($job.Mbid).txt"), [string]$out, (New-Object Text.UTF8Encoding $false))
+            $job.Item.TrackText = [string]$out
+        }
+        return
+    }
+    if ($script:Worker -or $script:DiscJob -or $script:GapsOpen) { return }   # look-ups, disc photos and What's missing? first
+    $next = $null
+    foreach ($i in $script:Items) {
+        if ($i.FromMb -and $null -eq $i.TrackText -and -not $script:TrackTried.Contains($i.Mbid)) { $next = $i; break }
+    }
+    if (-not $next) { return }
+    [void]$script:TrackTried.Add($next.Mbid)
+    $ps = [PowerShell]::Create()
+    [void]$ps.AddScript($script:TrackScan).AddArgument($next.Mbid).AddArgument($script:Agent)
+    $script:TrackJob = @{ PS = $ps; Handle = $ps.BeginInvoke(); Item = $next; Mbid = $next.Mbid }
+}
+
+function Select-RandomCd {
+    <# Pick for me: a CD at random from the ones shown, so a search narrows it down first. #>
+    $shown = @([Windows.Data.CollectionViewSource]::GetDefaultView($script:Items))
+    if (-not $shown.Count) { [void](Show-AppMessage $(if ($script:Items.Count) { 'No CDs match your search, so there is nothing to pick from.' } else { 'Add some CDs first.' })); return }
+    $now = $script:UI.Grid.SelectedItem
+    $pick = $shown | Get-Random
+    if ($shown.Count -gt 1) { while ([object]::ReferenceEquals($pick, $now)) { $pick = $shown | Get-Random } }   # always a different one
+    $script:UI.Grid.SelectedItem = $pick; $script:UI.Grid.ScrollIntoView($pick)
+    if ($script:UI.Wall.IsVisible) { $script:UI.Wall.ScrollIntoView($pick) }
+    Set-Status "How about $($pick.Artist) - $($pick.Title)$(if ($pick.Year) { " ($($pick.Year))" })$(if ($pick.Shelf) { ", $($pick.Shelf)" })? Press Pick for me again for another$(if ($shown.Count -lt $script:Items.Count) { " (picking from the $($shown.Count) your search shows)" })." 'Good'
+}
+
+# ---------------------------------------------------------------------------
+#  What's missing? An artist's albums on MusicBrainz, and which of them you have.
+# ---------------------------------------------------------------------------
+$script:GapScan = {
+    param([string[]]$Mbids, [string]$Agent)
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    function Get-Mb([string]$Path) {
+        for ($try = 0; $try -lt 3; $try++) {
+            Start-Sleep -Milliseconds (1100 + 2000 * $try)
+            try { return Invoke-RestMethod -Uri "https://musicbrainz.org/ws/2/$Path" -UserAgent $Agent -TimeoutSec 20 }
+            catch {
+                $code = 0; try { $code = [int]$_.Exception.Response.StatusCode } catch { $code = 0 }
+                if ($try -eq 2 -or $code -eq 400 -or $code -eq 404) { throw }   # only "busy" is worth asking again
+            }
+        }
+    }
+    try {
+        Start-Sleep -Milliseconds 1500   # let a background track or disc look-up finish first
+        $owned = @{}; $artist = $null
+        foreach ($m in @($Mbids | Select-Object -First 40)) {
+            # Each of your CDs: which album it is (and, from the first that answers, who the artist is).
+            try { $x = Get-Mb "release/$($m)?inc=artist-credits+release-groups&fmt=json" } catch { continue }   # a CD MusicBrainz no longer has
+            if ($x.'release-group'.id) { $owned[[string]$x.'release-group'.id] = $true }
+            if (-not $artist) { $artist = @($x.'artist-credit')[0].artist }
+        }
+        if (-not $artist) { throw "MusicBrainz didn't answer for any of these CDs" }
+        $all = @(); $offset = 0
+        do {
+            $page = Get-Mb "release-group?artist=$($artist.id)&type=album&limit=100&offset=$offset&fmt=json"
+            $all += @($page.'release-groups'); $offset += 100
+        } while ($offset -lt [int]$page.'release-group-count' -and $offset -lt 500)
+        $albums = @($all | Where-Object { $_.'primary-type' -eq 'Album' -and -not @($_.'secondary-types').Count } | ForEach-Object {
+            @{ Id = [string]$_.id; Title = [string]$_.title; Date = [string]$_.'first-release-date'; Have = $owned.ContainsKey([string]$_.id) } })
+        return @{ Artist = [string]$artist.name; ArtistId = [string]$artist.id; Albums = $albums }
+    } catch { return @{ Error = $_.Exception.Message } }
+}
+
+function Show-Gaps {
+    <# The selected artist's studio albums on MusicBrainz, with the ones you have marked. #>
+    $row = $script:UI.ArtistList.SelectedItem
+    if (-not $row -or -not $row.Key -or $row.Key -eq '*') { return }
+    $mine = @($script:Items | Where-Object { (Get-ArtistKey $_) -eq $row.Key })
+    $ids = @($mine | Where-Object { $_.FromMb } | ForEach-Object { $_.Mbid } | Select-Object -Unique)
+    if (-not $ids.Count) { [void](Show-AppMessage "None of your $($row.Name) CDs came from MusicBrainz, so their albums can't be looked up. Look one up (Edit, then Look up) and try again."); return }
+    $norm = { param($t) ([string]$t).ToLowerInvariant() -replace '[^\p{L}\p{N}]', '' }
+    $titles = @($mine | ForEach-Object { & $norm $_.Album })
+    $x = @'
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="640" Height="620" MinWidth="460" MinHeight="360" ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
+        FontFamily="Bahnschrift, Segoe UI" FontSize="13.5" Background="{Card}" Foreground="{Ink}">
+  <Window.Resources>
+STYLES
+  </Window.Resources>
+  <DockPanel Margin="22,6,22,18">
+    <TextBlock x:Name="GIntro" DockPanel.Dock="Top" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,12" Text="Looking at MusicBrainz... this takes a second or two for each of your CDs by them."/>
+    <DockPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
+      <Button x:Name="GClose" Content="Close" DockPanel.Dock="Right" MinWidth="80" Margin="0" IsCancel="True" IsDefault="True"/>
+      <TextBlock Foreground="{Soft}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"
+                 Text="Studio albums only (no singles, live albums or compilations), as MusicBrainz lists them."/>
+    </DockPanel>
+    <ProgressBar x:Name="GWait" DockPanel.Dock="Top" Height="3" IsIndeterminate="True" Margin="0,0,0,10"/>
+    <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="GList"/></ScrollViewer>
+  </DockPanel>
+</Window>
+'@.Replace('STYLES', $script:Styles)
+    $w = New-XamlWindow $x $script:Window
+    $w.Title = "What's missing? $($row.Name)"
+    $script:GapsOpen = $true   # background look-ups wait, so MusicBrainz isn't asked twice a second
+    $ps = [PowerShell]::Create()
+    [void]$ps.AddScript($script:GapScan).AddArgument([string[]]$ids).AddArgument($script:Agent)
+    $st = @{ PS = $ps; Handle = $ps.BeginInvoke(); Done = $false }
+    $tick = New-Object Windows.Threading.DispatcherTimer
+    $tick.Interval = [TimeSpan]::FromMilliseconds(300)
+    $tick.Add_Tick({
+        if ($st.Done -or -not $st.Handle.IsCompleted) { return }
+        $st.Done = $true; $tick.Stop()
+        $res = $null; try { $res = @($st.PS.EndInvoke($st.Handle)) | Select-Object -Last 1 } catch { $res = @{ Error = $_.Exception.Message } }
+        $st.PS.Dispose()
+        $w.FindName('GWait').Visibility = 'Collapsed'
+        $intro = $w.FindName('GIntro'); $list = $w.FindName('GList')
+        if (-not $res -or $res.Error) { $intro.Text = "Couldn't ask MusicBrainz just now$(if ($res.Error) { " ($($res.Error))" }). Try again in a minute."; return }
+        $albums = @($res.Albums | ForEach-Object { if (-not $_.Have -and $titles -contains (& $norm $_.Title)) { $_.Have = $true }; $_ } | Sort-Object { if ($_.Date) { $_.Date } else { '9999' } })
+        $have = @($albums | Where-Object { $_.Have }).Count
+        $intro.Text = if ($albums.Count) { "MusicBrainz lists $($albums.Count) studio album$(if ($albums.Count -ne 1) { 's' }) by $($res.Artist). You have $have of them, so $($albums.Count - $have) $(if ($albums.Count - $have -eq 1) { 'is' } else { 'are' }) missing." } else { "MusicBrainz doesn't list any studio albums by $($res.Artist)." }
+        foreach ($a in $albums) {
+            $g = New-Object Windows.Controls.Grid; $g.Margin = '0,3'
+            foreach ($cw in '56', '*', 'Auto', 'Auto') { $cd = New-Object Windows.Controls.ColumnDefinition; $cd.Width = (New-Object Windows.GridLengthConverter).ConvertFromString($cw); $g.ColumnDefinitions.Add($cd) }
+            $yr = New-Object Windows.Controls.TextBlock; $yr.Text = if ($a.Date) { $a.Date.Substring(0, [Math]::Min(4, $a.Date.Length)) } else { '' }; $yr.Foreground = Get-Brush 'Soft'; $yr.VerticalAlignment = 'Center'
+            $tt = New-Object Windows.Controls.TextBlock; $tt.Text = $a.Title; $tt.TextTrimming = 'CharacterEllipsis'; $tt.VerticalAlignment = 'Center'; $tt.ToolTip = $a.Title
+            if ($a.Have) { $tt.FontWeight = 'SemiBold' }
+            $chip = New-Object Windows.Controls.Border; $chip.CornerRadius = 8; $chip.Padding = '8,1,8,2'; $chip.Margin = '10,0'; $chip.VerticalAlignment = 'Center'
+            $ct = New-Object Windows.Controls.TextBlock; $ct.FontSize = 11.5; $ct.FontWeight = 'SemiBold'; $chip.Child = $ct
+            if ($a.Have) { $chip.Background = Get-Brush 'Accent'; $ct.Foreground = Get-Brush 'AccentInk'; $ct.Text = 'You have it' }
+            else { $chip.Background = Get-Brush 'Chip'; $ct.Foreground = Get-Brush 'Soft'; $ct.Text = 'Missing' }
+            $pg = New-Object Windows.Controls.Button; $pg.Content = 'See on MusicBrainz'; $pg.Padding = '12,5'; $pg.Margin = '0'; $pg.Tag = $a.Id
+            $pg.Add_Click({ Start-Process "https://musicbrainz.org/release-group/$($this.Tag)" })
+            [Windows.Controls.Grid]::SetColumn($tt, 1); [Windows.Controls.Grid]::SetColumn($chip, 2); [Windows.Controls.Grid]::SetColumn($pg, 3)
+            foreach ($c in $yr, $tt, $chip, $pg) { [void]$g.Children.Add($c) }
+            [void]$list.Children.Add($g)
+        }
+    })
+    $tick.Start()
+    $w.FindName('GClose').Add_Click({ $w.Close() })
+    $w.Add_Closed({ $script:GapsOpen = $false; $tick.Stop(); if (-not $st.Done) { try { $st.PS.Stop() } catch { Write-Verbose 'stopped' }; $st.PS.Dispose() } })
+    [void]$w.ShowDialog()
 }
 
 # Scan several: barcodes are collected first, then looked up one after another.
@@ -2636,7 +3095,7 @@ function Get-HtmlCard([CdItem]$Item) {
         'Year' = $Item.Year; 'Label' = $Item.Label; 'Country' = $(if ($Item.Country) { Get-CountryName $Item.Country })
         'Genre' = $Item.Genre
         'Tracks' = $(if ($Item.Tracks) { "$($Item.Tracks)$(if ($Item.Discs -gt 1) { " on $($Item.Discs) discs" })" })
-        'Barcode' = $Item.Barcode; 'Details from' = $(if ($Item.FromMb) { 'MusicBrainz' } else { 'entered by hand' }); 'Notes' = $Item.Notes
+        'Barcode' = $Item.Barcode; 'Kept' = $Item.Shelf; 'Details from' = $(if ($Item.FromMb) { 'MusicBrainz' } else { 'entered by hand' }); 'Notes' = $Item.Notes
     }
     $info = $null
     if ($Item.FromMb) {
@@ -2665,15 +3124,30 @@ function Get-HtmlCard([CdItem]$Item) {
     return $sb.ToString()
 }
 
-function Export-Html([string]$Path, [array]$Rows) {
+function Export-Html([string]$Path, [array]$Rows, [string]$GroupBy) {
     $artists = @($Rows | Where-Object Artist | Select-Object -ExpandProperty Artist -Unique).Count
     $sb = New-Object Text.StringBuilder
+    $group = $null
     foreach ($i in $Rows) {
+        if ($GroupBy) {
+            # A heading row for each artist (or place): its name, how many CDs and the years.
+            $keyOf = if ($GroupBy -eq 'Place') { { ([string]$args[0].Shelf).Trim().ToLowerInvariant() } } else { { ([string]$args[0].Artist).Trim().ToLowerInvariant() } }
+            $k = & $keyOf $i
+            if ($k -ne $group) {
+                $group = $k
+                $theirs = @($Rows | Where-Object { (& $keyOf $_) -eq $k })
+                $ys = @($theirs | ForEach-Object { $_.Year } | Where-Object { $_ -match '^\d{4}$' } | Sort-Object)
+                $span = if (-not $ys.Count) { '' } elseif ($ys[0] -eq $ys[-1]) { "  ·  $($ys[0])" } else { "  ·  $($ys[0]) to $($ys[-1])" }
+                $name = if ($GroupBy -eq 'Place') { if ($k) { Get-HtmlText ([string]$i.Shelf).Trim() } else { 'Place not set' } }
+                        elseif ($k) { Get-HtmlText ([string]$i.Artist).Trim() } else { '(no artist)' }
+                [void]$sb.AppendLine("<tr class=""grp""><td colspan=""12""><b>$name</b><span>$($theirs.Count) CD$(if ($theirs.Count -ne 1) { 's' })$span</span></td></tr>")
+            }
+        }
         $thumb = Get-ThumbData $i.Shown
         $cover = if ($thumb) { "<img src=""$thumb"" alt="""">" } else { '<span class="none"></span>' }
         $mb = if ($i.Mbid -and $i.Mbid -ne '-') { "<a href=""https://musicbrainz.org/release/$($i.Mbid)"">$(Get-HtmlText $i.Title)</a>" } else { Get-HtmlText $i.Title }
         $tracks = if ($i.Tracks) { [string]$i.Tracks + $(if ($i.Discs -gt 1) { " ($($i.Discs) discs)" }) } else { '' }
-        [void]$sb.AppendLine("<tr><td class=""c"">$cover</td><td>$(Get-HtmlText $i.Artist)</td><td class=""al"">$mb<div class=""card"">$(Get-HtmlCard $i)</div></td><td>$(Get-HtmlText $i.Year)</td><td>$(Get-HtmlText $i.Label)</td><td>$(Get-HtmlText $i.Country)</td><td>$(Get-HtmlText $i.Genre)</td><td class=""n"">$tracks</td><td class=""bc"">$(Get-HtmlText $i.Barcode)</td><td class=""nt"">$(Get-HtmlText $i.Notes)</td><td>$(if ($i.FromMb) { '<span class=""k mb"">MB</span>' } else { '<span class=""k hand"">Hand</span>' })</td></tr>")
+        [void]$sb.AppendLine("<tr><td class=""c"">$cover</td><td>$(Get-HtmlText $i.Artist)</td><td class=""al"">$mb<div class=""card"">$(Get-HtmlCard $i)</div></td><td>$(Get-HtmlText $i.Year)</td><td>$(Get-HtmlText $i.Label)</td><td>$(Get-HtmlText $i.Country)</td><td>$(Get-HtmlText $i.Genre)</td><td class=""n"">$tracks</td><td class=""bc"">$(Get-HtmlText $i.Barcode)</td><td class=""nt"">$(Get-HtmlText $i.Notes)</td><td>$(Get-HtmlText $i.Shelf)</td><td>$(if ($i.FromMb) { '<span class=""k mb"">MB</span>' } else { '<span class=""k hand"">Hand</span>' })</td></tr>")
     }
     $title = "CD catalogue, $((Get-Date).ToString('d MMMM yyyy'))"
     $html = @"
@@ -2694,6 +3168,8 @@ td.c { width:52px; } td.c img, td.c .none { width:44px; height:44px; object-fit:
 td.al { font-weight:600; } td.n, td.bc { white-space:nowrap; } td.nt { color:var(--soft); }
 a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
 .foot { color:var(--soft); margin-top:12px; font-size:12px; }
+tr.grp td { background:var(--page); padding:14px 10px 6px; border-bottom:1px solid var(--line); } tr.grp b { font-size:16px; } tr.grp span { color:var(--soft); margin-left:10px; }
+table.byartist th { cursor:default; }
 td .card { display:none; }
 #card { position:fixed; width:340px; max-height:80vh; overflow:hidden; background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:12px;
   box-shadow:0 10px 32px rgba(0,0,0,.3); padding:14px 16px; display:none; pointer-events:none; z-index:10; font-weight:400; }
@@ -2706,12 +3182,13 @@ td .card { display:none; }
 #big { position:fixed; width:300px; height:300px; object-fit:cover; border-radius:10px; box-shadow:0 10px 32px rgba(0,0,0,.35); background:var(--card); display:none; pointer-events:none; z-index:9; }
 td.c img { cursor:zoom-in; }
 .k { display:inline-block; padding:1px 7px 2px; border-radius:8px; font-size:11px; font-weight:600; } .k.mb { background:#0C6663; color:#FFFFFF; } .k.hand { background:#F4B740; color:#2A2210; }
-@media print { body { padding:0; background:#fff; color:#000; } input, #big, #card { display:none !important; } table { border:0; } tr { break-inside:avoid; } }
+@media print { tr.grp { break-after:avoid; } tr.grp td { background:#eee; }
+  body { padding:0; background:#fff; color:#000; } input, #big, #card { display:none !important; } table { border:0; } tr { break-inside:avoid; } }
 </style></head><body>
 <h1>$(Get-HtmlText $title)</h1>
-<p class="sum">$($Rows.Count) CD$(if ($Rows.Count -ne 1) { 's' }) by $artists artist$(if ($artists -ne 1) { 's' })</p>
+<p class="sum">$($Rows.Count) CD$(if ($Rows.Count -ne 1) { 's' }) by $artists artist$(if ($artists -ne 1) { 's' })$(if ($GroupBy) { ', by ' + $GroupBy.ToLower() })</p>
 <input id="q" type="search" placeholder="Search" aria-label="Search">
-<table id="t"><thead><tr><th></th><th>Artist</th><th>Album</th><th>Year</th><th>Label</th><th>Country</th><th>Genre</th><th>Tracks</th><th>Barcode</th><th>Notes</th><th>From</th></tr></thead>
+<table id="t"$(if ($GroupBy) { ' class="byartist"' })><thead><tr><th></th><th>Artist</th><th>Album</th><th>Year</th><th>Label</th><th>Country</th><th>Genre</th><th>Tracks</th><th>Barcode</th><th>Notes</th><th>Kept</th><th>From</th></tr></thead>
 <tbody>
 $($sb.ToString())</tbody></table>
 <p class="foot">Made by CD Catalogue v$script:AppVersion. Details from MusicBrainz, covers from the Cover Art Archive.</p>
@@ -2743,12 +3220,17 @@ tb.addEventListener('mouseleave', function () { card.style.display = 'none'; big
 tb.addEventListener('mouseover', function (e) { if (e.target.tagName === 'IMG' && e.target.parentNode.className === 'c') { big.src = e.target.src; big.style.display = 'block'; placeBig(e); } });
 tb.addEventListener('mousemove', function (e) { if (big.style.display === 'block') placeBig(e); });
 tb.addEventListener('mouseout', function (e) { if (e.target.tagName === 'IMG') big.style.display = 'none'; });
-var q = document.getElementById('q'), rows = Array.prototype.slice.call(document.querySelectorAll('#t tbody tr'));
+var q = document.getElementById('q'), rows = Array.prototype.slice.call(document.querySelectorAll('#t tbody tr:not(.grp)'));
+var grps = Array.prototype.slice.call(document.querySelectorAll('#t tbody tr.grp'));
 function shownText(r) { var c = r.cloneNode(true); c.querySelectorAll('.card').forEach(function (x) { x.remove(); }); return c.textContent.toLowerCase(); }
 rows.forEach(function (r) { r.dataset.find = shownText(r); });
-q.addEventListener('input', function () { var s = q.value.toLowerCase(); rows.forEach(function (r) { r.style.display = r.dataset.find.indexOf(s) >= 0 ? '' : 'none'; }); });
+q.addEventListener('input', function () {
+  var s = q.value.toLowerCase(); rows.forEach(function (r) { r.style.display = r.dataset.find.indexOf(s) >= 0 ? '' : 'none'; });
+  // By artist: an artist's heading shows while any of their CDs does.
+  grps.forEach(function (g) { var n = g.nextElementSibling, any = false; while (n && !n.classList.contains('grp')) { if (n.style.display !== 'none') any = true; n = n.nextElementSibling; } g.style.display = any ? '' : 'none'; });
+});
 document.querySelectorAll('#t th').forEach(function (th, n) {
-  if (!n) return;
+  if (!n || grps.length) return;   // a report by artist stays in artist order
   th.addEventListener('click', function () {
     var up = th.dataset.up !== '1'; th.dataset.up = up ? '1' : '0';
     var b = document.querySelector('#t tbody');
@@ -2778,23 +3260,31 @@ function Export-List([ValidateSet('Csv', 'Html')][string]$Kind) {
         [void](Show-AppMessage $(if ($script:Items.Count) { 'No CDs match your search. Clear it to export them all.' } else { 'There are no CDs to export yet. Scan a barcode or use Add by hand first.' }))
         return
     }
+    $what = if ($Kind -eq 'Csv') { 'the CSV file' } else { 'the report' }
+    $how = Show-AppChoice ("Save $what with the CDs as listed (in the same order as the list), by artist (each artist's CDs together, oldest first), " +
+        "or by place (where they're kept, each place's CDs by artist: a list to print and keep with them)?") 'As listed' 'By artist' $(if ($Kind -eq 'Csv') { 'Export CSV' } else { 'HTML report' }) 'By place'
+    if (-not $how) { return }
+    $group = @('', 'Artist', 'Place')[$how - 1]
+    $byYear = @{ Expression = { if ($_.Year -match '^\d{4}$') { $_.Year } else { '9999' } } }
+    if ($group -eq 'Artist') { $rows = @($rows | Sort-Object NoArtist, ArtistSort, $byYear, Album) }
+    if ($group -eq 'Place') { $rows = @($rows | Sort-Object @{ Expression = { [int](-not $_.Shelf) } }, @{ Expression = { ([string]$_.Shelf).ToLowerInvariant() } }, NoArtist, ArtistSort, $byYear, Album) }
     $ext = $Kind.ToLower()
     $dlg = New-Object Microsoft.Win32.SaveFileDialog
     $dlg.Filter = if ($Kind -eq 'Csv') { 'CSV file for Excel (*.csv)|*.csv' } else { 'HTML report (*.html)|*.html' }
     $dlg.DefaultExt = ".$ext"
     $dlg.AddExtension = $true
-    $dlg.FileName = "CD catalogue $((Get-Date).ToString('yyyy-MM-dd')).$ext"
+    $dlg.FileName = "CD catalogue$(if ($group) { ' by ' + $group.ToLower() }) $((Get-Date).ToString('yyyy-MM-dd')).$ext"
     if (-not $dlg.ShowDialog($script:Window)) { return }
     if ($Kind -eq 'Html') {
         $script:Window.Cursor = 'Wait'
-        try { Export-Html $dlg.FileName $rows } finally { $script:Window.Cursor = $null }
+        try { Export-Html $dlg.FileName $rows -GroupBy $group } finally { $script:Window.Cursor = $null }
         Set-Status "Saved the report of $($rows.Count) CD$(if ($rows.Count -ne 1) { 's' }): $($dlg.FileName)" 'Good'
         if (Show-AppMessage "Saved the report of $($rows.Count) CD$(if ($rows.Count -ne 1) { 's' }).`n`nOpen it now?" -YesText 'Open' -NoText 'Close') { Start-Process $dlg.FileName }
     } else {
         $rows | Select-Object @{ n = 'Artist'; e = { Get-ExcelText $_.Artist } }, @{ n = 'Album'; e = { Get-ExcelText $_.Album } },
             @{ n = 'Year'; e = { if ($_.Year -match '^[1-9]\d{3}$') { $_.Year } else { Get-ExcelText $_.Year } } },
             @{ n = 'Label'; e = { Get-ExcelText $_.Label } }, @{ n = 'Country'; e = { Get-ExcelText $_.Country } }, @{ n = 'Genre'; e = { Get-ExcelText $_.Genre } },
-            Tracks, Discs, @{ n = 'Barcode'; e = { Get-ExcelText $_.Barcode -Always } }, @{ n = 'Notes'; e = { Get-ExcelText $_.Notes } }, @{ n = 'Details from'; e = { $_.Source } }, @{ n = 'MusicBrainz'; e = { if ($_.Mbid -and $_.Mbid -ne '-') { "https://musicbrainz.org/release/$($_.Mbid)" } } } |
+            Tracks, Discs, @{ n = 'Barcode'; e = { Get-ExcelText $_.Barcode -Always } }, @{ n = 'Notes'; e = { Get-ExcelText $_.Notes } }, @{ n = 'Kept'; e = { Get-ExcelText $_.Shelf } }, @{ n = 'Details from'; e = { $_.Source } }, @{ n = 'MusicBrainz'; e = { if ($_.Mbid -and $_.Mbid -ne '-') { "https://musicbrainz.org/release/$($_.Mbid)" } } } |
             Export-Csv -LiteralPath $dlg.FileName -NoTypeInformation -Encoding UTF8
         Set-Status "Saved $($rows.Count) CD$(if ($rows.Count -ne 1) { 's' }) to $($dlg.FileName)" 'Good'
     }
@@ -2819,9 +3309,9 @@ try {
     $icon = Get-AssetImage 'CD-Catalogue.ico'
     if ($icon) { $window.Icon = $icon }
     $ui = @{}
-    foreach ($n in 'BtnCsv', 'BtnReport', 'BtnCollection', 'BtnLook', 'BtnHelp', 'BtnAbout', 'TxtStatus', 'Progress', 'TxtSearch', 'TxtHint', 'BtnField', 'Key', 'KeyMb', 'KeyHand', 'KeyMbText', 'KeyHandText', 'BtnLookup', 'BtnAdd', 'TxtSummary', 'TxtTotals',
+    foreach ($n in 'BtnCsv', 'BtnReport', 'BtnPick', 'BtnStats', 'BtnBackup', 'BtnCollection', 'BtnLook', 'BtnHelp', 'BtnAbout', 'TxtStatus', 'Progress', 'TxtSearch', 'TxtHint', 'BtnField', 'Key', 'KeyMb', 'KeyHand', 'KeyMbText', 'KeyHandText', 'BtnLookup', 'BtnAdd', 'TxtSummary', 'TxtTotals',
                    'TxtBarcode', 'BtnScan', 'BtnBatch', 'TxtScanNote', 'Grid', 'BtnEdit', 'BtnRemove', 'BtnMb', 'BtnInfo', 'BtnVersions', 'DNoCover', 'DCover', 'DDisc', 'DHub', 'DHole', 'DAlbum', 'DArtist', 'DMeta', 'DNotes',
-                   'ViewCovers', 'ViewList', 'ViewArtists', 'Wall', 'ListCard', 'ArtistCard', 'ArtistList', 'ArtCount', 'ArtName', 'ArtMeta', 'Disco',
+                   'ViewCovers', 'ViewList', 'ViewArtists', 'Wall', 'ListCard', 'ArtistCard', 'ArtistList', 'ArtCount', 'ArtName', 'ArtMeta', 'Disco', 'BtnGaps',
                    'Empty', 'EmptyTitle', 'EmptyText', 'Details') { $ui[$n] = $window.FindName($n) }
     # The wall's panel is the app's own type, so it's set here rather than in the XAML.
     $ui.Wall.ItemsPanel = New-Object Windows.Controls.ItemsPanelTemplate (New-Object Windows.FrameworkElementFactory ([CdWallPanel]))
@@ -2866,6 +3356,10 @@ try {
         }
     })
     $ui.BtnCollection.Add_Click({ Invoke-Safely { Show-Collection } })
+    $ui.BtnStats.Add_Click({ Invoke-Safely { Show-Stats } })
+    $ui.BtnPick.Add_Click({ Invoke-Safely { Select-RandomCd } })
+    $ui.BtnGaps.Add_Click({ Invoke-Safely { Show-Gaps } })
+    $ui.BtnBackup.Add_Click({ Invoke-Safely { Show-Backup } })
     $ui.BtnInfo.Add_Click({ Invoke-Safely { Show-Info $ui.Grid.SelectedItem } })
     $ui.BtnVersions.Add_Click({ Invoke-Safely { if ($ui.Grid.SelectedItem) { Show-Versions $ui.Grid.SelectedItem } } })
     $ui.BtnCsv.Add_Click({ Invoke-Safely { Export-List -Kind Csv } })
@@ -2944,7 +3438,7 @@ try {
     foreach ($sd in @(@('Artist', 'Ascending'), @('Year', 'Ascending'), @('Album', 'Ascending'))) { $sortView.SortDescriptions.Add((New-Object ComponentModel.SortDescription $sd[0], $sd[1])) }
     $timer = New-Object Windows.Threading.DispatcherTimer
     $timer.Interval = [TimeSpan]::FromMilliseconds(250)
-    $timer.Add_Tick({ try { Update-Worker; Step-Choose; Step-Disc } catch { Write-AppLog "Update: $($_.Exception.Message)" } })
+    $timer.Add_Tick({ try { Update-Worker; Step-Choose; Step-Disc; Step-Tracks } catch { Write-AppLog "Update: $($_.Exception.Message)" } })
     $window.Add_ContentRendered({
         Invoke-Safely {
             Read-Catalogue

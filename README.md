@@ -6,7 +6,7 @@
 
 A searchable list of your CDs, with artist, album, year and cover.
 
-![Version](https://img.shields.io/badge/version-v1.02-blue) ![Platform](https://img.shields.io/badge/platform-Windows-0078D6) ![PowerShell](https://img.shields.io/badge/PowerShell-5.1-5391FE) ![Licence](https://img.shields.io/badge/licence-MIT-green) ![Last commit](https://img.shields.io/github/last-commit/jason4bury/CD-Catalogue)
+![Version](https://img.shields.io/badge/version-v1.03-blue) ![Platform](https://img.shields.io/badge/platform-Windows-0078D6) ![PowerShell](https://img.shields.io/badge/PowerShell-5.1-5391FE) ![Licence](https://img.shields.io/badge/licence-MIT-green) ![Last commit](https://img.shields.io/github/last-commit/jason4bury/CD-Catalogue)
 
 
 ## ✨ Features
@@ -25,8 +25,14 @@ CD Catalogue is a PowerShell/WPF tool that keeps a searchable list of your physi
 - **The CD's label**: the disc beside the cover shows a photo of the CD itself when the Cover Art Archive has one.
 - **A wall of covers**: your collection as album art, or as a sortable list, in the app's own teal and amber look with its own window frame.
 - **More about the CD and artist**: the CD's track listing with times, when the album first came out, the pressing's label and catalogue number, format, genres and the album's Wikipedia introduction; beside it the artist: where they're from, when they formed or were born, genres, the band's members with their years, the Wikipedia introduction, and links to MusicBrainz, Wikipedia, Discogs and their own site. It's kept, so it opens at once next time.
-- **Export CSV**: saves the list (or what your search found) as a CSV file for Excel and other spreadsheets.
-- **HTML report**: saves it as a page with the covers, to open in any browser, print or share. Hover over a cover to see it bigger, or over an album for its details and tracks.
+- **Backup and restore**: the whole catalogue (CDs, notes, covers and disc photos) in one .zip file, and back again on this PC or another. A restore saves what was there first, so it can be undone.
+- **Pick for me**: can't decide? A CD at random from the ones shown.
+- **Search by song**: find which CD has a song (track lists come from MusicBrainz in the background).
+- **What's missing?**: an artist's studio albums on MusicBrainz, with the ones you have marked.
+- **Stats**: your collection in numbers, with bars for each decade, the artists you have most of, top labels and genres.
+- **Kept**: note where each CD lives, picked from your own list of places (such as In Front Room and In Loft), and search for it.
+- **Export CSV**: saves the list (or what your search found) as a CSV file for Excel and other spreadsheets, as listed, by artist or by place.
+- **HTML report**: saves it as a page with the covers, to open in any browser, print or share, as listed, by artist or by place (a list to print and keep with them). Hover over a cover to see it bigger, or over an album for its details and tracks.
 - **Excel-safe CSV**: opens correctly with a double-click, with every barcode digit and titles such as 007 or 3/4 as typed. Such values are written as `="007"` in the file, which programs other than spreadsheets will show as they are.
 - Sort by any column in the list; the selected CD's sleeve, disc and details beside it; Edit, Remove, open the CD's MusicBrainz page, light and dark looks, Help and an About box.
 
@@ -48,7 +54,7 @@ CD Catalogue is a PowerShell/WPF tool that keeps a searchable list of your physi
 
 ## 📦 Installation
 
-1. Download `CD-Catalogue-v1.02.zip` from the [latest release](../../releases/latest) and unzip it wherever you like to keep it.
+1. Download `CD-Catalogue-v1.03.zip` from the [latest release](../../releases/latest) and unzip it wherever you like to keep it.
 2. Double-click **CD Catalogue.cmd** in the unzipped folder. It makes a **CD Catalogue** shortcut there and in the Start menu, and starts the tool. From then on, use the shortcut, the Start menu or a pinned taskbar button.
 
 Nothing is installed and no Windows settings are changed. The shortcut runs the script with PowerShell's execution policy bypassed for that run only.
