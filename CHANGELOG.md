@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.04] - 2026-11-23
+### Changed
+- **Help** brought up to date and put in a clearer order: search lists every field (Kept and Track too), song
+  search, exports (as listed, by artist or by place) and backups each have their own section, and where the
+  catalogue is kept lists every folder.
+
 ## [1.03] - 2026-11-23
 ### Added
 - **Backup and restore** (Backup in the side bar): the whole catalogue (CDs, notes, covers, disc photos and what

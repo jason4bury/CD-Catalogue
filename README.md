@@ -6,7 +6,7 @@
 
 A searchable list of your CDs, with artist, album, year and cover.
 
-![Version](https://img.shields.io/badge/version-v1.03-blue) ![Platform](https://img.shields.io/badge/platform-Windows-0078D6) ![PowerShell](https://img.shields.io/badge/PowerShell-5.1-5391FE) ![Licence](https://img.shields.io/badge/licence-MIT-green) ![Last commit](https://img.shields.io/github/last-commit/jason4bury/CD-Catalogue)
+![Version](https://img.shields.io/badge/version-v1.04-blue) ![Platform](https://img.shields.io/badge/platform-Windows-0078D6) ![PowerShell](https://img.shields.io/badge/PowerShell-5.1-5391FE) ![Licence](https://img.shields.io/badge/licence-MIT-green) ![Last commit](https://img.shields.io/github/last-commit/jason4bury/CD-Catalogue)
 
 
 ## ✨ Features
@@ -54,7 +54,7 @@ CD Catalogue is a PowerShell/WPF tool that keeps a searchable list of your physi
 
 ## 📦 Installation
 
-1. Download `CD-Catalogue-v1.03.zip` from the [latest release](../../releases/latest) and unzip it wherever you like to keep it.
+1. Download `CD-Catalogue-v1.04.zip` from the [latest release](../../releases/latest) and unzip it wherever you like to keep it.
 2. Double-click **CD Catalogue.cmd** in the unzipped folder. It makes a **CD Catalogue** shortcut there and in the Start menu, and starts the tool. From then on, use the shortcut, the Start menu or a pinned taskbar button.
 
 Nothing is installed and no Windows settings are changed. The shortcut runs the script with PowerShell's execution policy bypassed for that run only.
@@ -84,9 +84,11 @@ Double-click **Build.cmd** in the repo folder. It reads `build.json`, checks eve
 **Where settings live:** `%APPDATA%\CD Catalogue`, never inside the repo or a release folder.
 
 - `catalogue.json`: the CDs.
-- `Covers\`: the covers from the Cover Art Archive.
+- `Covers\`: the covers and disc photos from the Cover Art Archive.
 - `Info\`: what More about the CD and artist found, so it opens at once next time.
-- `settings.json`: the look, covers or list, and (if you use MB collection) the MusicBrainz sign-in, encrypted for your Windows account.
+- `Tracks\`: each CD's track titles, for searching by song.
+- `Backups\`: your catalogue as it was before a restore.
+- `settings.json`: the look, covers, list or artists, your places for Kept, and (if you use MB collection) the MusicBrainz sign-in, encrypted for your Windows account.
 - `CD Catalogue.log`: look-ups and anything that went wrong.
 
 ## 📝 Changelog

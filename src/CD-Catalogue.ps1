@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 # The version lives here and in CHANGELOG.md; Build.cmd stops if they disagree.
 # Two-digit minor: 1.00, 1.01 ... 1.10. The release folder is "CD Catalogue v<version>".
 $script:AppName     = 'CD Catalogue'
-$script:AppVersion  = '1.03'
+$script:AppVersion  = '1.04'
 $script:Description = 'PowerShell/WPF tool for cataloguing a CD collection'
 $script:Copyright   = 'Copyright (c) 2026 Jason Rhodes'
 $script:RepoUrl     = 'https://github.com/jason4bury/CD-Catalogue'
@@ -881,61 +881,67 @@ $script:InfoScan = {
 # ---------------------------------------------------------------------------
 $script:HelpText = @'
 WHAT IT DOES
-CD Catalogue keeps a searchable list of your CDs: artist, album, year, label, number of tracks and discs, the barcode, the cover and your own notes.
+CD Catalogue keeps a searchable list of your CDs: artist, album, year, label, number of tracks and discs, the barcode, the cover, where each CD is kept and your own notes.
 
 ADDING CDS BY BARCODE
 Click in the barcode box at the top and scan the barcode on the back of the CD with a USB or Bluetooth barcode scanner (it types the number and presses Enter for you), or type the number under the bars and press Enter. The details come from MusicBrainz and the cover from the Cover Art Archive (both free, no account). You can scan one CD after another: each is looked up in turn, about one a second. A CD already in the list is pointed out instead of being added twice. A barcode MusicBrainz doesn't know is still added, as "(not found)", so you can fill it in with Edit.
 
-WHICH VERSION IS YOURS?
-MusicBrainz often has several versions of a CD with the same barcode: other countries, reissues, different labels or box sets. When a barcode has more than one, the CD is added with the most likely one and, once the look-ups have finished, the app asks which is yours: each version shows its cover, date, country, label, catalogue number, format and tracks (See on MusicBrainz opens its page there, with its track list and photos of the sleeve). Pick yours, or Keep the current one. Choose the version, under a CD's details, shows them again at any time.
-
 SCANNING SEVERAL CDS FIRST
 Scan several lets you scan a pile of CDs before anything is looked up. Press Scan several, scan the first CD, then the next, and so on: each barcode goes on a waiting list (the status line shows them, and the Search button how many). When you've scanned them all, press Search (or press Enter in the empty barcode box, or type search). They're then looked up one after another, about one a second, and each appears in the list as it's found. A CD already in your catalogue, or already on the list, is pointed out as you scan it. Cancel (or Esc) leaves Scan several and forgets the list.
 
+WHICH VERSION IS YOURS?
+MusicBrainz often has several versions of a CD with the same barcode: other countries, reissues, different labels or box sets. When a barcode has more than one, the CD is added with the most likely one and, once the look-ups have finished, the app asks which is yours: each version shows its cover, date, country, label, catalogue number, format and tracks (See on MusicBrainz opens its page there, with its track list and photos of the sleeve). Pick yours, or Keep the current one. Choose the version, under a CD's details, shows them again at any time.
+
 CDS WITHOUT A BARCODE
-Add by hand adds one by hand. Look up in the edit box (or Look up online for all of them) finds the year, label, tracks and cover by artist and album.
+Add by hand adds one by hand. Look up in the edit window (or Look up online for all of them) finds the year, label, tracks and cover by artist and album.
 
-THE LIST
-Covers shows your CDs as a wall of covers, List as a list, and Artists by artist; the app remembers which. In List, click a column heading to sort (Covers follows the same order). Click a CD to see its cover and details in the panel at the bottom right; Edit changes it (or double-click the CD), Remove takes it off the list, and MusicBrainz opens its page there. Export CSV saves the list (or just the CDs your search found) as a CSV file for Excel and other spreadsheets, as listed, by artist or by place. HTML report saves it as a page with the covers, to open in any browser, print or share: as listed, by artist (a heading for each artist, their CDs oldest first) or by place (a heading for each place where CDs are kept: print it and keep it with them); hover over a cover there to see it bigger, or over an album for its details (with the tracks, once More about the CD and artist has been opened for it).
+COVERS, LIST AND ARTISTS
+Covers shows your CDs as a wall of covers, List as a list, and Artists by artist; the app remembers which. In List, click a column heading to sort (Covers follows the same order). Click a CD to see its cover and details in the panel at the bottom right: Edit changes it (or double-click the CD), Remove takes it off the list, and MusicBrainz opens its page there.
 
-
-THE KEY: MB AND HAND
-Every CD has a mark on its cover (and in List's From column): MB when its details came from MusicBrainz (scanned, or found with Look up), Hand when they were entered by hand (added by hand, or a barcode MusicBrainz didn't know, filled in with Edit). The key at the top right shows how many of each; click one to show only those CDs, and click it again to show them all. You can also search source:mb or source:hand. A hand-entered CD becomes MB once Look up (or Look up online) finds it.
 ARTISTS
 Artists lists every artist on the left, with how many CDs you have and the years they span. It opens on All artists (every CD, in artist order and then by year); pick an artist to see them like a discography: all their CDs together, oldest first, with their genres and labels. The search box works here too. Names count as the same artist whatever their capitals, "The" is skipped when they're put in order, and CDs with no artist are listed last. Click a cover to see its details; double-click it to edit it.
 
-SEARCHING
-Type in the search box to find CDs; the search runs a moment after you stop typing. It looks through everything: artist, album, label, genre, barcode, notes, and the year when you type one. The button at its right (All) picks one thing to search instead: Artist, Album, Year, Label, Genre, Barcode or Notes.
-You can also type what to search in the box, and mix them: artist:harbours  year:1997  label:attic  genre:folk  barcode:5000  notes:signed  kept:loft  source:hand. Put a name with spaces in quotes, such as label:"little wheel". Everything you type has to match, so artist:harbours year:1990-1999 finds that artist's CDs from the 1990s.
-A year can be one year (1997), a range (1990-1999, or 1990 to 1999) or a decade (1990s). The status line says how many CDs match.
-To find which CD has a song, pick Track on the button (or type track:harbour lights). Track lists come from MusicBrainz in the background, about one CD a second, for the CDs found there; Everything searches them too.
+WHAT'S MISSING?
+In Artists, pick an artist and press What's missing? to see their studio albums on MusicBrainz (no singles, live albums or compilations), oldest first, with the ones you have marked and See on MusicBrainz for each. It needs at least one of their CDs to have come from MusicBrainz, and takes a second or two for each of their CDs.
 
+THE KEY: MB AND HAND
+Every CD has a mark on its cover (and in List's From column): MB when its details came from MusicBrainz (scanned, or found with Look up), Hand when they were entered by hand (added by hand, or a barcode MusicBrainz didn't know, filled in with Edit). The key at the top right shows how many of each; click one to show only those CDs, and click it again to show them all. You can also search source:mb or source:hand. A hand-entered CD becomes MB once Look up (or Look up online) finds it.
+
+SEARCHING
+Type in the search box to find CDs; the search runs a moment after you stop typing. It looks through everything: artist, album, label, genre, barcode, notes, where it's kept, track titles, and the year when you type one. The button at its right (All) picks one thing to search instead: Artist, Album, Year, Label, Genre, Barcode, Notes, Kept or Track.
+You can also type what to search in the box, and mix them: artist:harbours  year:1997  label:attic  genre:folk  barcode:5000  notes:signed  kept:loft  track:"harbour lights"  source:hand. Put words with spaces in quotes, such as label:"little wheel". Everything you type has to match, so artist:harbours year:1990-1999 finds that artist's CDs from the 1990s.
+A year can be one year (1997), a range (1990-1999, or 1990 to 1999) or a decade (1990s). The status line says how many CDs match.
+
+SEARCHING FOR A SONG
+To find which CD has a song, pick Track on the search button (or type track: and the title). Track lists come from MusicBrainz in the background, about one CD a second, for the CDs found there, so a newly added CD can be searched by song a little later. CDs entered by hand have no track list.
 
 WHERE IT'S KEPT
-Kept, in the edit window, is where the CD lives: pick one of your places (or Not set). Places... changes the list, such as In Front Room; In Loft. It shows in the CD's details and in List, the search finds it (or type kept:loft), and it's in the CSV, the report and Stats.
-
+Kept, in the edit window, is where the CD lives: pick one of your places (or Not set). Places... changes the list, such as In Front Room; In Loft. It shows in the CD's details and in List's Kept column, the search finds it (or type kept:loft), and it's in the CSV, the report and Stats.
 
 PICK FOR ME
 Can't decide what to play? Pick for me (in the side bar) picks a CD at random and shows it. It picks from the CDs shown, so search first to pick from one place (kept:loft), genre or decade. Press it again for another.
 
-WHAT'S MISSING?
-In Artists, pick an artist and press What's missing? to see their studio albums on MusicBrainz (no singles, live albums or compilations), oldest first, with the ones you have marked and See on MusicBrainz for each. It needs at least one of their CDs to have come from MusicBrainz, and takes a second or two for each of their CDs.
-STATS
-Stats shows your collection in numbers: how many CDs, artists, discs and tracks, the years they span, how many came from MusicBrainz, and bars for each decade, the artists you have most of, the top labels and genres, and where they're kept.
-
-BACKUP AND RESTORE
-Backup saves your whole catalogue (the CDs, your notes, covers, disc photos and what More about found) in one .zip file: keep it on another drive or in the cloud. Restore puts a backup back on this PC or another one, replacing the CDs there; the catalogue as it was is saved first in the Backups folder in the data folder, so a restore can be undone. Settings and the MusicBrainz sign-in aren't in a backup.
-CSV FILES AND EXCEL
-The CSV opens correctly in Excel with a double-click: barcodes keep every digit, and titles such as 007 or 3/4 stay as typed. To do that such values are written as ="007" in the file, which is what you'll see in a plain text editor, or in a program other than a spreadsheet that reads the CSV.
-
 THE DISC
-The disc beside the cover shows the CD's own label when the Cover Art Archive has a photo of it (people add these to MusicBrainz, so popular CDs often have one and others don't). They're found in the background, a CD at a time, for each CD from MusicBrainz; when its own version has none, the other versions with the same barcode are tried, as they usually share the disc print. A CD with no photo is looked at again a week later, in case someone has added one. Photos are kept in the Covers folder. With no photo, it shows a blank CD.
+The disc beside the cover shows the CD's own label when the Cover Art Archive has a photo of it (people add these to MusicBrainz, so popular CDs often have one and others don't). They're found in the background, a CD at a time, for each CD from MusicBrainz; when its own version has none, the other versions with the same barcode are tried, as they usually share the disc print. A CD with no photo is looked at again a week later, in case someone has added one. With no photo, it shows a blank CD.
 
 MORE ABOUT THE CD AND ARTIST
 More about the CD and artist shows the cover and the disc (its label, or a blank CD), and side by side:
 - the CD: its track listing with times, when the album first came out, this pressing's date, country, label and catalogue number, the format and packaging, genres, and the album's Wikipedia introduction;
 - the artist: where they're from, when they formed or were born (and split up or died), genres, the band's members (or the bands a person was in), and the artist's Wikipedia introduction.
 The links open the pages on MusicBrainz, Wikipedia, Discogs and the artist's own site. It's kept, so it opens at once next time (Look up again gets the latest). A CD with no genre gets one from MusicBrainz. Wikipedia is in the language Windows uses when there's a page in it, else English.
+
+STATS
+Stats (in the side bar) shows your collection in numbers: how many CDs, artists, discs and tracks, the years they span, how many came from MusicBrainz or were entered by hand, and bars for each decade, the artists you have most of, the top labels and genres, and where they're kept.
+
+EXPORT CSV AND HTML REPORT
+Both save the CDs shown (all of them, or just the ones your search found), and ask how: as listed (the same order as the list), by artist (each artist's CDs together, oldest first) or by place (each place's CDs by artist: print it and keep it with them).
+Export CSV saves a file for Excel and other spreadsheets. HTML report saves a page with the covers, to open in any browser, print or share; by artist or by place it has a heading for each. In the report, hover over a cover to see it bigger, or over an album for its details (with the tracks, once More about the CD and artist has been opened for it).
+
+CSV FILES AND EXCEL
+The CSV opens correctly in Excel with a double-click: barcodes keep every digit, and titles such as 007 or 3/4 stay as typed. To do that such values are written as ="007" in the file, which is what you'll see in a plain text editor, or in a program other than a spreadsheet that reads the CSV.
+
+BACKUP AND RESTORE
+Backup (in the side bar) saves your whole catalogue (the CDs, your notes, covers, disc photos, track lists and what More about found) in one .zip file: keep it on another drive or in the cloud. Restore puts a backup back on this PC or another one, replacing the CDs there; the catalogue as it was is saved first in the Backups folder in the data folder, so a restore can be undone. Settings (the look, your places and the MusicBrainz sign-in) aren't in a backup.
 
 MUSICBRAINZ ACCOUNT (OPTIONAL)
 Looking CDs up never needs an account. If you have a MusicBrainz account, two more things are possible:
@@ -949,7 +955,7 @@ LOOK
 The Look button switches between Light, Dark and Auto (the same as Windows), from the next start.
 
 WHERE YOUR CATALOGUE IS KEPT
-In %APPDATA%\CD Catalogue: catalogue.json (your CDs), settings.json, the Covers and Info folders, and a log. Nothing is kept in the program's own folder, so a new version finds your CDs as they are.
+In %APPDATA%\CD Catalogue: catalogue.json (your CDs), settings.json, the Covers, Info and Tracks folders, the Backups folder (after a restore) and a log. Nothing is kept in the program's own folder, so a new version finds your CDs as they are.
 '@
 
 # ---------------------------------------------------------------------------
